@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "serial-agent-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "serial2mcp.main"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\niusulong\\serial2mcp--1\\serial2mcp\\src",
+        "SERIAL2MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}

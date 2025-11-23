@@ -1,0 +1,15 @@
+# 核心依赖
+pyserial>=3.5              # 串口通信
+fastmcp>=0.2.0             # MCP协议实现
+typing-extensions>=4.0.0   # 类型注解支持
+
+# 异步支持
+asyncio-mqtt>=0.13.0       # 异步MQTT支持(可选)
+
+# 数据处理
+numpy>=1.21.0              # 数值计算(可选)
+protobuf>=3.20.0           # 协议缓冲区(可选)
+
+# 日志和监控
+structlog>=22.1.0          # 结构化日志
+prometheus-client>=0.14.0  # 指标收集(可选)

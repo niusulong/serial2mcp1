@@ -1,0 +1,194 @@
+"""
+后台数据接收线程
+负责持续从串口读取数据并进行分流处理
+"""
+import threading
+import queue
+import time
+from typing import Optional
+import serial
+from ..utils.logger import get_logger
+from ..utils.exceptions import SerialConnectionError
+from ..utils.config import config_manager
+from ..utils.metrics import metrics_collector
+
+
+class BackgroundReader:
+    """后台数据接收线程，负责持续从串口读取数据并根据模式进行分流处理"""
+
+    def __init__(self):
+        """初始化后台接收线程"""
+        self.logger = get_logger("background_reader")
+        self.config = config_manager.get_config()
+        self.thread: Optional[threading.Thread] = None
+        self.stop_event = threading.Event()
+
+        # 依赖组件
+        self.connection_manager = None
+        self.sync_mode_event = None
+        self.sync_response_queue = None
+        self.urc_queue = None
+
+        # 本地缓冲区和状态
+        self._urc_buffer = bytearray()
+        self._last_receive_time = time.time()
+        self._is_running = False
+
+    def initialize(self,
+                   connection_manager,
+                   sync_mode_event: threading.Event,
+                   sync_response_queue: queue.Queue,
+                   urc_queue: queue.Queue) -> None:
+        """
+        初始化后台接收线程的依赖
+
+        Args:
+            connection_manager: 连接管理器实例
+            sync_mode_event: 同步模式事件
+            sync_response_queue: 同步响应队列
+            urc_queue: URC队列
+        """
+        self.connection_manager = connection_manager
+        self.sync_mode_event = sync_mode_event
+        self.sync_response_queue = sync_response_queue
+        self.urc_queue = urc_queue
+        self.logger.info("后台接收线程初始化完成")
+
+    def start(self) -> None:
+        """启动后台接收线程"""
+        if self._is_running:
+            self.logger.warning("后台接收线程已在运行中")
+            return
+
+        self.stop_event.clear()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+        self._is_running = True
+        self.logger.info("后台接收线程已启动")
+
+    def stop(self) -> None:
+        """停止后台接收线程"""
+        if not self._is_running:
+            return
+
+        self.stop_event.set()
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=2.0)  # 等待最多2秒让线程结束
+
+        self._is_running = False
+        self.logger.info("后台接收线程已停止")
+
+    def _run(self) -> None:
+        """后台接收线程主循环"""
+        self.logger.debug("后台接收线程主循环开始")
+
+        while not self.stop_event.is_set():
+            try:
+                # 检查串口是否连接
+                if not self.connection_manager or not self.connection_manager.is_connected():
+                    # 短暂休眠，避免过度占用CPU
+                    time.sleep(0.1)
+                    continue
+
+                # 检查是否有可读数据
+                if self.connection_manager.serial_port and self.connection_manager.serial_port.in_waiting > 0:
+                    # 读取可用数据
+                    data = self.connection_manager.read(self.connection_manager.serial_port.in_waiting)
+
+                    if data:
+                        # 记录接收数据到性能指标
+                        metrics_collector.record_receive(len(data))
+
+                        # 根据当前模式决定数据流向
+                        if self.sync_mode_event.is_set():
+                            # 同步模式：直接发送到同步响应队列
+                            try:
+                                self.sync_response_queue.put_nowait(data)
+                                self.logger.debug(f"同步模式：发送 {len(data)} 字节到响应队列")
+
+                                # 如果URC缓冲区有数据，需要强制推送到URC队列
+                                if self._urc_buffer:
+                                    self._flush_urc_buffer()
+
+                            except queue.Full:
+                                self.logger.error("同步响应队列已满")
+                        else:
+                            # 异步模式（URC模式）：添加到URC缓冲区
+                            self._urc_buffer.extend(data)
+                            self._last_receive_time = time.time()
+                            self.logger.debug(f"URC模式：添加 {len(data)} 字节到URC缓冲区")
+
+                # 检查URC缓冲区是否需要分包（基于空闲超时）
+                self._check_urc_idle_timeout()
+
+                # 短暂休眠，避免过度占用CPU
+                time.sleep(0.01)  # 10ms
+
+            except serial.SerialException as e:
+                if not self.stop_event.is_set():  # 如果不是主动停止
+                    self.logger.error(f"串口读取异常: {e}")
+                    metrics_collector.record_error()
+                    # 短暂休眠后继续尝试
+                    time.sleep(0.5)
+            except Exception as e:
+                if not self.stop_event.is_set():  # 如果不是主动停止
+                    self.logger.error(f"后台接收线程发生未知错误: {e}")
+                    metrics_collector.record_error()
+                    # 短暂休眠后继续尝试
+                    time.sleep(0.5)
+
+        # 线程结束前，确保URC缓冲区中的数据被处理
+        self._flush_urc_buffer()
+        self.logger.debug("后台接收线程主循环结束")
+
+    def _check_urc_idle_timeout(self) -> None:
+        """检查URC空闲超时，如果超过设定时间没有新数据，则分包"""
+        current_time = time.time()
+        idle_duration = current_time - self._last_receive_time
+
+        # 如果URC缓冲区有数据且空闲时间超过阈值，则进行分包
+        if (self._urc_buffer and
+            idle_duration >= self.config.driver.idle_timeout):
+            self._flush_urc_buffer()
+
+    def _flush_urc_buffer(self) -> None:
+        """刷新URC缓冲区，将数据发送到URC队列"""
+        if not self._urc_buffer:
+            return
+
+        urc_data = bytes(self._urc_buffer)
+        self._urc_buffer.clear()
+
+        try:
+            # 尝试将URC数据放入队列
+            self.urc_queue.put_nowait(urc_data)
+            self.logger.debug(f"URC缓冲区数据已推送到队列: {len(urc_data)} 字节")
+        except queue.Full:
+            self.logger.error("URC队列已满，数据丢失")
+            metrics_collector.record_urc_overflow()
+
+        # 更新最后接收时间
+        self._last_receive_time = time.time()
+
+    def is_running(self) -> bool:
+        """
+        检查后台接收线程是否在运行
+
+        Returns:
+            线程运行状态
+        """
+        return self._is_running and self.thread and self.thread.is_alive()
+
+    def get_reader_status(self) -> dict:
+        """
+        获取接收线程状态
+
+        Returns:
+            接收线程状态信息
+        """
+        return {
+            'is_running': self.is_running(),
+            'urc_buffer_size': len(self._urc_buffer),
+            'last_receive_time': self._last_receive_time,
+            'idle_duration': time.time() - self._last_receive_time
+        }
