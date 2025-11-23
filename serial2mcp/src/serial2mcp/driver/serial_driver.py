@@ -140,39 +140,47 @@ class SerialDriver:
 
             # 根据策略获取响应
             if wait_policy == 'none':
+                # 射后不理模式：直接发送数据
+                self.connection_manager.write(data)
                 return {
                     'success': True,
                     'message': '数据已发送，不等待响应',
                     'pending_urc_count': self.get_pending_urc_count()
                 }
-            elif wait_policy == 'keyword':
-                if not stop_pattern:
-                    raise InvalidInputError("关键词等待模式需要指定停止模式")
+            elif wait_policy in ['keyword', 'timeout', 'at_command']:
+                # 清空同步响应队列以避免之前的残留数据
+                while not self._sync_response_queue.empty():
+                    try:
+                        self._sync_response_queue.get_nowait()
+                    except queue.Empty:
+                        break
 
                 # 进入同步模式以捕获响应数据
-                self.enter_sync_mode()
-                try:
+                self._sync_mode.set()
+
+                # 在发送前短暂延迟，确保模式切换生效
+                time.sleep(0.001)
+
+                # 发送数据前清空输入缓冲区，防止残留数据干扰
+                self.connection_manager.flush_input()
+
+                # 发送数据
+                self.connection_manager.write(data)
+
+                # 立即开始接收响应（在同步模式下）
+                if wait_policy == 'keyword':
+                    # 关键字模式：等待直到找到指定的停止模式
                     result = self._receive_until_keyword(stop_pattern, timeout)
-                finally:
-                    self.exit_sync_mode()
-                return result
-            elif wait_policy == 'timeout':
-                # 进入同步模式以捕获响应数据
-                self.enter_sync_mode()
-                try:
-                    result = self._receive_for_timeout(timeout)
-                finally:
-                    self.exit_sync_mode()
-                return result
-            elif wait_policy == 'at_command':
-                # 进入同步模式以捕获响应数据
-                self.enter_sync_mode()
-                try:
+                elif wait_policy == 'timeout':
+                    result = self._receive_until_timeout(timeout)
+                elif wait_policy == 'at_command':
                     # 专门针对AT指令的处理模式：等待回显+响应
                     original_cmd = data.decode('utf-8', errors='replace')
                     result = self._receive_at_response(original_cmd, timeout)
-                finally:
-                    self.exit_sync_mode()
+
+                # 退出同步模式
+                self._sync_mode.clear()
+
                 return result
             else:
                 raise InvalidInputError(f"不支持的等待策略: {wait_policy}")
@@ -184,8 +192,12 @@ class SerialDriver:
 
     def _receive_until_keyword(self, stop_pattern: str, timeout: float) -> Dict[str, Any]:
         """接收数据直到找到指定关键词"""
+        if not stop_pattern:
+            raise InvalidInputError("停止模式不能为空")
+
         start_time = time.time()
         received_data = b""
+        stop_pattern_bytes = stop_pattern.encode('utf-8')
 
         while time.time() - start_time < timeout:
             try:
@@ -193,17 +205,18 @@ class SerialDriver:
                 chunk = self._sync_response_queue.get(timeout=0.1)
                 if chunk:
                     received_data += chunk
+                    self.logger.debug(f"接收到数据块: {chunk!r}, 累计: {received_data!r}")
 
                     # 检查是否包含停止模式
-                    if stop_pattern.encode() in received_data:
-                        self.logger.debug(f"找到停止模式: {stop_pattern}")
+                    if stop_pattern_bytes in received_data:
+                        self.logger.debug(f"找到停止模式 '{stop_pattern}' 在数据中")
                         break
             except queue.Empty:
                 # 继续等待
                 continue
 
         # 如果超时仍未收到停止模式，则视为超时
-        if stop_pattern.encode() not in received_data:
+        if stop_pattern_bytes not in received_data:
             self.logger.warning(f"接收超时，未找到停止模式: {stop_pattern}")
             raise SerialTimeoutError(f"接收超时，未找到停止模式: {stop_pattern}")
 
@@ -224,7 +237,7 @@ class SerialDriver:
                 'data': decoded_data,
                 'raw_data': received_data,
                 'is_hex': is_hex,
-                'found_stop_pattern': stop_pattern.encode() in received_data,
+                'found_stop_pattern': stop_pattern_bytes in received_data,
                 'bytes_received': len(received_data),
                 'pending_urc_count': self.get_pending_urc_count(),
                 'success': True
@@ -235,6 +248,52 @@ class SerialDriver:
                 'raw_data': b'',
                 'is_hex': False,
                 'found_stop_pattern': False,
+                'bytes_received': 0,
+                'pending_urc_count': self.get_pending_urc_count(),
+                'success': True
+            }
+
+    def _receive_until_timeout(self, timeout: float) -> Dict[str, Any]:
+        """在指定时间内接收所有数据"""
+        start_time = time.time()
+        received_data = b""
+
+        while time.time() - start_time < timeout:
+            try:
+                # 尝试从同步响应队列获取数据
+                chunk = self._sync_response_queue.get(timeout=0.1)
+                if chunk:
+                    received_data += chunk
+            except queue.Empty:
+                # 继续等待直到时间结束
+                continue
+
+        # 记录接收数据到性能指标
+        if received_data:
+            metrics_collector.record_receive(len(received_data))
+
+        if received_data:
+            # 尝试解码为字符串
+            try:
+                decoded_data = received_data.decode('utf-8')
+                is_hex = False
+            except UnicodeDecodeError:
+                decoded_data = received_data.hex()
+                is_hex = True
+
+            return {
+                'data': decoded_data,
+                'raw_data': received_data,
+                'is_hex': is_hex,
+                'bytes_received': len(received_data),
+                'pending_urc_count': self.get_pending_urc_count(),
+                'success': True
+            }
+        else:
+            return {
+                'data': '',
+                'raw_data': b'',
+                'is_hex': False,
                 'bytes_received': 0,
                 'pending_urc_count': self.get_pending_urc_count(),
                 'success': True
@@ -287,93 +346,9 @@ class SerialDriver:
             }
 
     def _receive_at_response(self, original_cmd: str, timeout: float) -> Dict[str, Any]:
-        """接收AT命令响应，处理回显和实际响应"""
-        start_time = time.time()
-        received_data = b""
-
-        # 首先等待数据 - 可能是回显或直接响应
-        initial_wait_time = min(0.5, timeout)  # 初始等待0.5秒或更短
-        while time.time() - start_time < initial_wait_time:
-            try:
-                chunk = self._sync_response_queue.get(timeout=0.1)
-                if chunk:
-                    received_data += chunk
-            except queue.Empty:
-                continue
-
-        # 检查是否包含原始命令（回显）或有其他响应
-        cmd_bytes = original_cmd.encode('utf-8')
-        has_echo = cmd_bytes in received_data
-
-        # 如果有回显，等待更多响应数据
-        if has_echo:
-            remaining_timeout = timeout - (time.time() - start_time)
-            if remaining_timeout > 0:
-                # 继续等待命令响应
-                response_start_time = time.time()
-                consecutive_empty = 0  # 连续空读取次数
-
-                while time.time() - response_start_time < remaining_timeout and consecutive_empty < 3:
-                    try:
-                        chunk = self._sync_response_queue.get(timeout=0.2)  # 适当延长等待时间
-                        if chunk:
-                            received_data += chunk
-                            consecutive_empty = 0  # 重置计数
-                        else:
-                            consecutive_empty += 1
-                    except queue.Empty:
-                        consecutive_empty += 1
-                        if consecutive_empty >= 3:
-                            break
-        else:
-            # 没有回显，但可能有其他响应数据
-            # 继续等待额外时间以确保获取所有可能的响应
-            remaining_timeout = timeout - (time.time() - start_time)
-            if remaining_timeout > 0:
-                extra_start = time.time()
-                consecutive_empty = 0
-                while time.time() - extra_start < remaining_timeout and consecutive_empty < 2:
-                    try:
-                        chunk = self._sync_response_queue.get(timeout=0.1)
-                        if chunk:
-                            received_data += chunk
-                            consecutive_empty = 0  # 重置计数
-                        else:
-                            consecutive_empty += 1
-                    except queue.Empty:
-                        consecutive_empty += 1
-
-        # 记录接收数据到性能指标
-        if received_data:
-            metrics_collector.record_receive(len(received_data))
-
-        if received_data:
-            # 尝试解码为字符串
-            try:
-                decoded_data = received_data.decode('utf-8')
-                is_hex = False
-            except UnicodeDecodeError:
-                decoded_data = received_data.hex()
-                is_hex = True
-
-            # 特殊处理：如果数据只包含回显，没有实际响应，也应返回
-            return {
-                'data': decoded_data,
-                'raw_data': received_data,
-                'is_hex': is_hex,
-                'bytes_received': len(received_data),
-                'pending_urc_count': self.get_pending_urc_count(),
-                'success': True
-            }
-        else:
-            return {
-                'data': '',
-                'raw_data': b'',
-                'is_hex': False,
-                'bytes_received': 0,
-                'pending_urc_count': self.get_pending_urc_count(),
-                'success': True
-            }
+        """接收AT命令响应，简单地在超时时间内收集所有数据"""
+        # 直接使用超时接收方法收集所有数据
+        return self._receive_until_timeout(timeout)
 
     def send_string(self, data: str, encoding: str = 'utf-8') -> None:
         """

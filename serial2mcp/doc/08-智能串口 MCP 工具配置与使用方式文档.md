@@ -131,7 +131,7 @@ python -m serial2mcp.main
   "success": true,
   "data": "+CSQ: 22,99\r\n\r\nOK\r\n",
   "is_hex": false,
-  "found_keyword": true,
+  "found_stop_pattern": true,
   "pending_urc_count": 1,
   "bytes_received": 15
 }

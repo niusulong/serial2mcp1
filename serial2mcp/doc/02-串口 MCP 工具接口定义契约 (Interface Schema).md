@@ -86,8 +86,8 @@
       },
       "wait_policy": {
         "type": "string",
-        "enum": ["keyword", "timeout", "none"],
-        "description": "等待策略：'keyword'关键字等待模式，'timeout'纯时间等待模式，'none'射后不理模式"
+        "enum": ["keyword", "timeout", "none", "at_command"],
+        "description": "等待策略：'keyword'关键字等待模式，'timeout'纯时间等待模式，'none'射后不理模式，'at_command'AT命令专用模式"
       },
       "stop_pattern": {
         "type": "string",
@@ -128,7 +128,8 @@
   "success": true,
   "data": "响应内容...",
   "is_hex": false,
-  "found_keyword": true,
+  "found_stop_pattern": true,  // 仅在 keyword 模式下有效
+  "bytes_received": 15,  // 接收到的字节数
   "pending_urc_count": 2  // 告知模型后台还有URC没读
 }
 ```

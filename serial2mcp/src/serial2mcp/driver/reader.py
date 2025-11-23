@@ -92,8 +92,9 @@ class BackgroundReader:
 
                 # 检查是否有可读数据
                 if self.connection_manager.serial_port and self.connection_manager.serial_port.in_waiting > 0:
-                    # 读取可用数据
-                    data = self.connection_manager.read(self.connection_manager.serial_port.in_waiting)
+                    # 读取可用数据，使用较小的读取块以减少数据拼接问题
+                    chunk_size = min(1024, self.connection_manager.serial_port.in_waiting)
+                    data = self.connection_manager.read(chunk_size)
 
                     if data:
                         # 记录接收数据到性能指标
@@ -104,7 +105,7 @@ class BackgroundReader:
                             # 同步模式：直接发送到同步响应队列
                             try:
                                 self.sync_response_queue.put_nowait(data)
-                                self.logger.debug(f"同步模式：发送 {len(data)} 字节到响应队列")
+                                self.logger.debug(f"同步模式：发送 {len(data)} 字节到响应队列: {data!r}")
 
                                 # 如果URC缓冲区有数据，需要强制推送到URC队列
                                 if self._urc_buffer:
@@ -116,13 +117,13 @@ class BackgroundReader:
                             # 异步模式（URC模式）：添加到URC缓冲区
                             self._urc_buffer.extend(data)
                             self._last_receive_time = time.time()
-                            self.logger.debug(f"URC模式：添加 {len(data)} 字节到URC缓冲区")
+                            self.logger.debug(f"URC模式：添加 {len(data)} 字节到URC缓冲区: {data!r}")
 
                 # 检查URC缓冲区是否需要分包（基于空闲超时）
                 self._check_urc_idle_timeout()
 
                 # 短暂休眠，避免过度占用CPU
-                time.sleep(0.01)  # 10ms
+                time.sleep(0.005)  # 减少休眠时间以提高响应性
 
             except serial.SerialException as e:
                 if not self.stop_event.is_set():  # 如果不是主动停止

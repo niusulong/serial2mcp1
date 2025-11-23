@@ -39,7 +39,10 @@ class ParameterConverter:
 
         if encoding_lower == 'utf8':
             try:
-                return data.encode('utf-8')
+                # 处理常见的转义序列
+                # 将 \\r\\n, \\n, \\r 等转换为实际的控制字符
+                processed_data = data.replace('\\r\\n', '\r\n').replace('\\n', '\n').replace('\\r', '\r')
+                return processed_data.encode('utf-8')
             except UnicodeEncodeError as e:
                 self.logger.error(f"UTF-8编码失败: {e}")
                 raise InvalidInputError(f"UTF-8编码失败: {e}")
