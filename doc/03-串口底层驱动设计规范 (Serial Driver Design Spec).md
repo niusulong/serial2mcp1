@@ -1,9 +1,9 @@
 # 串口底层驱动设计规范 (Serial Driver Design Spec)
 
-**版本:** V1.1 (Logic & Architecture Focus)  
+**版本:** V1.2 (Logic & Architecture Focus)
 **目标:** 构建一个无业务逻辑、线程安全、支持"同步指令"与"异步URC"自动分流的串口 I/O 引擎。
 
-这是 Step 2: 底层驱动设计规范 (文档 3) 的修订版。  
+这是 Step 2: 底层驱动设计规范 (文档 3) 的修订版。
 根据您的要求，本文档不包含具体代码，而是侧重于核心逻辑描述、程序流程图 (Flowcharts) 和 时序图 (Sequence Diagrams)，以便于开发人员理解数据流向和并发控制机制。
 
 ## 1. 核心架构设计
@@ -42,28 +42,28 @@ flowchart TD
     Start((线程启动)) --> CheckConn{串口已连接?}
     CheckConn -- No --> Exit((线程结束))
     CheckConn -- Yes --> HasData{硬件缓冲区<br>有数据?}
-    
+
     %% 读取数据分支
     HasData -- Yes --> ReadBytes[读取字节流]
     ReadBytes --> IsSync{处于同步模式?<br>(Sync Event Set?)}
-    
+
     %% 同步模式处理 (直接转发)
     IsSync -- Yes --> PushResp[写入同步响应队列<br>Response Queue]
     PushResp --> CheckURCBuffer{URC缓冲<br>非空?}
     CheckURCBuffer -- Yes --> ForceFlush[强制打包剩余URC<br>写入URC队列] --> ResetTimer
     CheckURCBuffer -- No --> ResetTimer[更新最后接收时间]
-    
+
     %% 空闲模式处理 (缓冲+分包)
     IsSync -- No --> AppendBuff[追加到本地 URC Buffer]
     AppendBuff --> ResetTimer
-    
+
     %% 空闲超时检查 (URC 分包核心逻辑)
     HasData -- No --> CheckBuff{URC Buffer<br>非空?}
     CheckBuff -- Yes --> TimeDiff{当前时间 - 最后接收时间<br> > 空闲阈值(100ms)?}
     TimeDiff -- Yes --> PackURC[打包 Buffer 内容<br>生成 URC 消息]
     PackURC --> PushURC[写入异步 URC 队列<br>URC Queue]
     PushURC --> ClearBuff[清空 URC Buffer]
-    
+
     %% 循环
     ResetTimer --> Sleep[微小休眠 10ms]
     ClearBuff --> Sleep
@@ -82,31 +82,47 @@ flowchart TD
     Validate --> EnterSync[**进入同步模式**<br>Set Sync Event = True]
     EnterSync --> ClearQ[清空旧的响应队列]
     ClearQ --> SendData[发送 Payload 数据]
-    
+
     %% 接收循环
     SendData --> LoopStart{循环检查}
     LoopStart --> CheckTimeout{总耗时 ><br>Timeout?}
     CheckTimeout -- Yes --> TimeoutExit[标记为超时]
-    
+
     CheckTimeout -- No --> FetchQ[尝试从响应队列<br>获取数据片段]
     FetchQ -- 空/无数据 --> LoopStart
     FetchQ -- 有数据 --> Append[追加到结果 Buffer]
-    
+
     %% 策略判定
     Append --> CheckPolicy{策略类型?}
-    
+
     %% 策略 A: 关键字等待
     CheckPolicy -- Keyword --> Match{Buffer 包含<br>关键字?}
     Match -- Yes --> SuccessExit[标记为成功]
     Match -- No --> LoopStart
-    
+
     %% 策略 B: 纯时间等待
     CheckPolicy -- Timeout --> LoopStart
-    
+
+    %% 策略 C: 射后不理
+    CheckPolicy -- None --> NoneExit[立即退出]
+
+    %% 策略 D: AT命令模式
+    CheckPolicy -- AT Command --> AtLoopStart{循环检查}
+    AtLoopStart --> AtCheckTimeout{总耗时 ><br>Timeout?}
+    AtCheckTimeout -- Yes --> AtTimeoutExit[标记为超时]
+    AtCheckTimeout -- No --> AtFetchQ[尝试从响应队列<br>获取数据片段]
+    AtFetchQ -- 空/无数据 --> AtLoopStart
+    AtFetchQ -- 有数据 --> AtAppend[追加到结果 Buffer]
+    AtAppend --> AtLoopStart
+
     %% 退出处理
     TimeoutExit --> ExitAction
     SuccessExit --> ExitAction
-    
+    NoneExit --> NoneExitAction
+    AtTimeoutExit --> ExitAction
+    AtLoopStart --> ExitAction
+
+    NoneExitAction[**不退出同步模式**<br>Set Sync Event = False] --> NoneReturn[返回发送成功]
     ExitAction[**退出同步模式**<br>Set Sync Event = False] --> Return[返回 Buffer 数据]
 ```
 
@@ -134,41 +150,41 @@ sequenceDiagram
     HW->>Thread: 收到数据: "\r\n+CMTI:" (半包)
     Thread->>Thread: 检查模式: Idle
     Thread->>Thread: 存入本地 URC Buffer
-    
+
     %% 2. LLM 此时发起指令调用
     LLM->>Driver: 调用 send("AT+CSQ", wait="OK")
     Driver->>Thread: **Set Sync Mode = True** (原子操作)
     Driver->>QueueResp: 清空残留数据
     Driver->>HW: 发送 "AT+CSQ\r\n"
-    
+
     %% 3. 硬件回显指令 (Echo) + URC 第二部分到达
     %% 假设运气不好，它们混在一起了
     HW->>Thread: 收到数据: " SM, 1\r\n" (URC剩余)
-    
+
     %% 这里的逻辑很关键：一旦进入 Sync Mode，数据优先给响应队列
     %% 但为了防止 URC 丢失，我们需要在切换瞬间做处理（参考逻辑说明）
     Note right of Thread: 检测到 Sync Mode 开启
     Thread->>QueueURC: **强制打包** Buffer里的 "\r\n+CMTI:"
     Thread->>QueueResp: 转发新数据 " SM, 1\r\n"
-    
+
     %% 4. 真正的指令响应到达
     HW->>Thread: 收到数据: "\r\n+CSQ: 20,99\r\nOK\r\n"
     Thread->>QueueResp: 转发数据
-    
+
     %% 5. 主线程读取与判定
     Loop 主线程读取
         Driver->>QueueResp: 获取数据
         Driver->>Driver: 拼接 Buffer
         Driver->>Driver: 检测到 "OK"
     End
-    
+
     Driver->>Thread: **Set Sync Mode = False**
     Driver-->>LLM: 返回响应数据 (包含乱入的半截URC*)
-    
+
     %% *注：此处设计权衡。
     %% 为了保证指令响应的实时性，同步期间的所有数据都视为响应。
     %% 大模型收到 "+CSQ..." 里夹杂了 "SM,1"，模型有能力识别并忽略它。
-    
+
     %% 6. 后续 URC 处理
     Note over Thread: 回到 Idle Mode
     HW->>Thread: 收到心跳包
@@ -193,9 +209,9 @@ sequenceDiagram
 
 当"同步指令"与"异步URC"发生冲突（如时序图中所示）时，遵循以下设计权衡：
 
-**原则：** 指令响应优先级 > URC 数据完整性。  
-**理由：** LLM 正在等待回答，延迟是不可接受的。而 URC 晚一点处理没关系。  
-**副作用：** 在极少数并发情况下，同步响应的数据包里可能会夹杂一部分 URC 数据（如 +CMTI... OK）。  
+**原则：** 指令响应优先级 > URC 数据完整性。
+**理由：** LLM 正在等待回答，延迟是不可接受的。而 URC 晚一点处理没关系。
+**副作用：** 在极少数并发情况下，同步响应的数据包里可能会夹杂一部分 URC 数据（如 +CMTI... OK）。
 **解决方案：** 依靠 LLM 强大的文本清洗能力。我们在 System Prompt 中会指示模型："如果你在响应中看到了非预期的 URC 文本，请忽略它，并在后续通过 read_urc 工具查阅。"
 
 ### 4.3 编码自适应逻辑 (Encoding Adaptation)
@@ -208,8 +224,18 @@ sequenceDiagram
 3. 如果成功：返回 (string, format='utf8')。
 4. 如果抛出 UnicodeDecodeError：
    - 捕捉异常。
-   - 执行 raw_bytes.hex(' ') (转换为 "AA BB CC")。
+   - 执行 raw_bytes.hex() (转换为 "aabbcc...")。
    - 返回 (hex_string, format='hex')。
+
+### 4.4 AT命令模式处理策略 (AT Command Handling Strategy)
+
+专门针对AT指令的处理模式，自动处理回显和响应，提高AT指令交互的可靠性。
+
+**逻辑：**
+1. 发送AT命令前清空输入缓冲区。
+2. 发送命令后，等待回显（与发送的命令匹配）。
+3. 跳过回显部分，继续等待实际响应。
+4. 直到收到"OK"、"ERROR"或其他终止符。
 
 ## 5. 接口定义 (Class Methods Abstract)
 
@@ -218,5 +244,22 @@ sequenceDiagram
 - **connect(port, baudrate):** 初始化资源，启动 Reader 线程。
 - **disconnect():** 设置停止事件，等待线程 Join，释放资源。
 - **write(bytes):** 纯粹的硬件写入。
-- **read_sync(wait_policy, parameter):** 封装了"进入Sync模式 -> 循环读取 -> 退出Sync模式"的完整生命周期。这是暴露给 MCP 工具层的唯一读取接口。
+- **send_data(bytes, wait_policy, **kwargs):** 根据不同的等待策略，封装了完整的发送和接收逻辑。支持 keyword, timeout, none, at_command 四种模式。
+- **read_sync(wait_policy, parameter):** 封装了"进入Sync模式 -> 循环读取 -> 退出Sync模式"的完整生命周期。这是暴露给 MCP 工具层的读取接口之一。
 - **read_urc():** 简单的从 URC_Queue 中 get_all。
+- **initialize():** 驱动初始化方法，初始化所有内部组件。
+- **get_urc_messages(clear=True):** 获取URC消息列表，可选择是否清空队列。
+- **get_pending_urc_count():** 获取待处理的URC消息数量。
+
+## 6. 架构组件说明
+
+### 6.1 实际实现架构
+
+当前实现包含以下几个主要组件：
+
+- **SerialDriver:** 串口驱动主类，协调各组件并提供统一接口
+- **ConnectionManager:** 串口连接管理器，负责底层串口连接操作
+- **BackgroundReader:** 后台数据接收线程，实现生产者-消费者模型的生产者部分
+- **DataProcessor:** 数据处理器，负责数据格式转换和协议处理
+- **ParameterConverter:** 参数转换器，在MCP接口参数和驱动方法参数之间转换
+- **SerialToolWrapper:** 工具包装器，将驱动功能适配为MCP工具接口

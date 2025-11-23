@@ -1,6 +1,6 @@
 # 智能串口 MCP 工具需求规格说明书 (PRD)
 
-**版本号:** V0.1 (Draft)  
+**版本号:** V1.0
 **项目代号:** Serial-Agent-MCP
 
 ## 1. 项目概述
@@ -12,16 +12,17 @@
 - **无状态执行器：** 工具本体不硬编码任何 AT 指令集或特定协议解析逻辑。
 - **动态策略：** 由 LLM 在运行时决定发送什么、怎么接收、何时超时。
 - **全类型支持：** 兼顾 AT 指令（文本行）与 纯数据传输（HEX/二进制）。
+- **智能分流：** 自动区分同步响应和异步URC（未请求消息）。
 
 ## 2. 核心功能需求 (Functional Requirements)
 
 ### 2.1 串口连接管理 (Connection Manager)
-**F1-1 参数配置：** 支持配置 端口号 (Port)、波特率 (Baudrate)、数据位、停止位、校验位。  
-**F1-2 热插拔检测：** (可选) 自动检测可用串口列表的变化。  
+**F1-1 参数配置：** 支持配置 端口号 (Port)、波特率 (Baudrate)、数据位、停止位、校验位。
+**F1-2 热插拔检测：** (可选) 自动检测可用串口列表的变化。
 **F1-3 状态反馈：** 向 LLM 提供当前连接状态（Connected/Disconnected/Occupied）。
 
 ### 2.2 智能收发接口 (Smart Transceiver)
-这是工具最核心的功能，必须实现一个"万能发送函数"，支持以下三种模式：
+这是工具最核心的功能，必须实现一个"万能发送函数"，支持以下四种模式：
 
 **F2-1 关键字等待模式 (Wait-for-Keyword)：**
 - 发送数据后，持续读取，直到接收流中出现指定字符串（如 OK, ERROR, >）。
@@ -35,6 +36,11 @@
 **F2-3 射后不理模式 (No-Wait/Fire-and-Forget)：**
 - 发送数据后立即返回"发送成功"，不读取任何响应。
 - 后续产生的响应数据归入"被动接收流（URC）"处理。
+
+**F2-4 AT命令模式 (AT Command Mode)：**
+- 专门处理AT命令的回显和响应。
+- 自动处理命令回显（如发送"AT+CSQ"后会收到回显"AT+CSQ"）。
+- 适用场景：标准AT指令交互。
 
 ### 2.3 数据流处理与 URC (Data Stream Processor)
 由于串口是字节流，工具需负责将流切分为"包"：
@@ -59,58 +65,44 @@
 工具需通过 MCP 协议暴露以下 Tool 给大模型：
 
 ### 3.1 list_ports
-**描述：** 列出当前系统所有可用的串口设备。  
-**返回：** 设备路径列表及描述（如 ["/dev/ttyUSB0 - CP2102"]）。
+**描述：** 列出当前系统所有可用的串口设备。
+**返回：** 设备路径列表及描述（如 [{"port": "/dev/ttyUSB0", "description": "CP2102", "hardware_id": "USB VID:PID..."}]）。
 
 ### 3.2 configure_connection
-**描述：** 打开或关闭串口，配置参数。  
-**参数：** port, baudrate, timeout, action (open/close)。
+**描述：** 打开或关闭串口，配置参数。
+**参数：** 
+- port: 串口设备路径
+- baudrate: 波特率
+- timeout: 超时时间
+- action: 操作类型 (open/close)
 
 ### 3.3 send_data (核心)
-**描述：** 发送数据并根据策略获取响应。  
+**描述：** 发送数据并根据策略获取响应。
 **参数：**
-- payload (string): 发送内容。
-- encoding (enum): "utf8" | "hex"。
-- wait_policy (enum): "keyword" | "timeout" | "none"。
-- stop_pattern (string): 仅在 keyword 模式下有效（如 "OK"）。
-- timeout_ms (int): 等待超时时间。
-
-**返回：**
-```json
-{
-  "success": true,
-  "data": "响应内容...",
-  "is_hex": false,
-  "found_keyword": true,
-  "pending_urc_count": 2  // 告知模型后台还有URC没读
-}
-```
+- payload: 发送内容
+- encoding: 编码格式 (utf8/hex)
+- wait_policy: 等待策略 (keyword/timeout/none/at_command)
+- stop_pattern: 仅在 keyword 模式下有效（如 'OK'）
+- timeout_ms: 等待超时时间（毫秒）
 
 ### 3.4 read_urc
-**描述：** 读取后台缓冲区中积累的未处理消息（URC）。  
-**返回：** 数据包列表。
+**描述：** 读取后台缓冲区中积累的未处理消息（URC）。
+**返回：** URC消息列表
 
-## 4. 非功能需求 (Non-Functional Requirements)
+## 4. 技术实现栈
 
-### 4.1 响应延迟
-工具自身的处理开销（不含串口IO时间）应 < 10ms，保证透传的实时性。
+### 4.1 MCP 实现
+- **MCP 库:** 使用官方 `mcp` 库实现 MCP 协议
+- **协议:** JSON-RPC over stdio
+- **并发:** asyncio 支持
 
-### 4.2 鲁棒性与熔断
-**数据熔断：** 单次接收缓冲区限制（例如 4KB）。如果设备发送大量数据，工具必须截断并返回"Output Truncated"，防止 Token 消耗过大或造成 LLM 幻觉。  
-**容错：** 发送 HEX 格式错误的字符串时，工具应返回清晰的 Error Message 而不是崩溃。
+### 4.2 串口通信
+- **库:** pyserial
+- **并发模型:** 单生产者-双消费者模型
+- **线程安全:** 使用 threading.Event 和 queue.Queue
 
-### 4.3 平台兼容性
-优先支持 Windows/Linux (pyserial 跨平台)，考虑到嵌入式开发环境的多样性。
-
-## 5. 系统边界 (Boundaries)
-
-### 5.1 工具 不做 什么
-- 不解析语义：工具不知道 +CSQ: 20,99 是信号好的意思，只管把它当字符串返回。
-- 不判断业务结果：工具不判定"测试通过"或"失败"，只返回"收到了什么"。
-- 不自动重试：除非 LLM 发起第二次调用，否则工具层不进行自动重传。
-
-### 5.2 大模型 做 什么
-- 决定发什么：构建 AT 指令或二进制包。
-- 决定怎么收：根据指令类型选择等待 OK 还是等待 500ms。
-- 分析结果：解析返回的数据，判断是否符合预期。
-- 处理 URC：根据 read_urc 的内容，分析设备是否出现异常或状态变更。
+### 4.3 架构层次
+- **接口层:** main.py, server.py (MCP协议实现)
+- **适配层:** adapter/ (参数转换、异常处理)
+- **驱动层:** driver/ (串口驱动、数据处理)
+- **工具层:** utils/ (日志、配置、异常定义)

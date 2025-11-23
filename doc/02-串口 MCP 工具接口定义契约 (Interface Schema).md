@@ -1,11 +1,9 @@
 # 串口 MCP 工具接口定义契约 (Interface Schema)
 
-**版本:** V1.0  
+**版本:** V1.1
 **用途:** 定义大模型调用串口工具的标准格式。
 
 这份文档采用了标准 JSON Schema 格式（兼容 OpenAI Function Calling 和 MCP Protocol）。你可以直接将此内容复制给大模型（如 ChatGPT、Claude），并在 System Prompt 中告诉它："你拥有以下工具，请根据用户的需求选择合适的工具进行调用。"
-
-如果不确定模型能否理解，可以看文档末尾的**"自测验证部分"**。
 
 ## 1. 工具列表概览
 
@@ -24,7 +22,7 @@
 {
   "name": "list_ports",
   "description": "列出当前系统所有可用的串口设备。",
-  "parameters": {
+  "inputSchema": {
     "type": "object",
     "properties": {},
     "required": []
@@ -38,7 +36,7 @@
 {
   "name": "configure_connection",
   "description": "打开或关闭串口，配置参数。",
-  "parameters": {
+  "inputSchema": {
     "type": "object",
     "properties": {
       "port": {
@@ -72,7 +70,7 @@
 {
   "name": "send_data",
   "description": "发送数据并根据策略获取响应。",
-  "parameters": {
+  "inputSchema": {
     "type": "object",
     "properties": {
       "payload": {
@@ -109,7 +107,7 @@
 {
   "name": "read_urc",
   "description": "读取后台缓冲区中积累的未处理消息（URC）。",
-  "parameters": {
+  "inputSchema": {
     "type": "object",
     "properties": {},
     "required": []
@@ -127,10 +125,12 @@
 {
   "success": true,
   "data": "响应内容...",
+  "raw_data": "b'\\x01\\x03...'",  // 原始字节数据
   "is_hex": false,
   "found_stop_pattern": true,  // 仅在 keyword 模式下有效
   "bytes_received": 15,  // 接收到的字节数
-  "pending_urc_count": 2  // 告知模型后台还有URC没读
+  "pending_urc_count": 2,  // 告知模型后台还有URC没读
+  "message": "额外信息（可选）"
 }
 ```
 
@@ -143,7 +143,29 @@
 }
 ```
 
-## 4. 验证测试 (Self-Check)
+## 4. 等待策略详解
+
+### 4.1 keyword 模式
+- **用途**: 等待特定关键字（如"OK", "ERROR"）
+- **适用**: AT指令交互
+- **参数**: 需要设置 `stop_pattern`
+
+### 4.2 timeout 模式
+- **用途**: 等待固定时间，收集该时间内的所有数据
+- **适用**: 二进制协议、未知响应内容
+- **参数**: 需要设置 `timeout_ms`
+
+### 4.3 none 模式
+- **用途**: 发送后立即返回，不等待响应
+- **适用**: 配置命令等不需要响应的场景
+- **参数**: 无需特殊参数
+
+### 4.4 at_command 模式
+- **用途**: 专门用于AT命令，自动处理回显和响应
+- **适用**: 标准AT指令交互
+- **参数**: 需要设置 `timeout_ms`
+
+## 5. 验证测试 (Self-Check)
 
 为了验证这套 Schema 是否合理，你可以把下面的测试提示词 (Prompt) 发给 ChatGPT，看它生成的 JSON 是否符合你的预期。
 
