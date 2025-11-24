@@ -2,3 +2,23 @@
 基础工具类定义
 包含所有 MCP 工具的基类和通用功能
 """
+from typing import Dict, Any
+from ..utils.logger import get_logger
+from ..utils.exceptions import SerialConnectionError, SerialDataError, InvalidInputError
+from ..driver.serial_driver import SerialDriver
+from ..adapter.converter import ParameterConverter
+from ..adapter.exception_handler import ExceptionHandler
+
+
+class BaseTool:
+    """MCP工具基类"""
+
+    def __init__(self, driver: SerialDriver):
+        self.driver = driver
+        self.logger = get_logger(self.__class__.__name__.lower())
+        self.converter = ParameterConverter()
+        self.exception_handler = ExceptionHandler()
+
+    def handle_exception(self, e: Exception) -> Dict[str, Any]:
+        """统一异常处理"""
+        return self.exception_handler.handle_exception(e)
