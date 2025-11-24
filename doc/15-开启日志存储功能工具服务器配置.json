@@ -8,11 +8,19 @@
         "SERIAL2MCP_LOG_LEVEL": "INFO",
         "COM_LOG_ENABLED": "true",
         "TOOL_LOG_ENABLED": "true",
-        "COM_LOG_PATH": "logs/com_log",
-        "TOOL_LOG_PATH": "logs/tool_log",
+        "COM_LOG_PATH": "D:\\niusulong\\serial2mcp--1\\logs\\com_log",
+        "TOOL_LOG_PATH": "D:\\niusulong\\serial2mcp--1\\logs\\tool_log",
         "LOG_RETENTION_DAYS": "30",
         "LOG_MAX_FILE_SIZE_MB": "10"
-      }
+      },
+      "description": "智能串口 MCP 工具服务器配置 - 启用日志存储功能",
+      "notes": [
+        "此配置启用工具日志和串口通信日志记录",
+        "日志路径使用绝对路径以确保日志文件创建在项目目录中",
+        "TOOL_LOG_PATH: 记录MCP服务器运行日志",
+        "COM_LOG_PATH: 记录串口通信数据日志(HEX和TXT格式)",
+        "使用绝对路径避免因MCP工作目录不同导致的日志存储位置不一致问题"
+      ]
     }
   }
 }

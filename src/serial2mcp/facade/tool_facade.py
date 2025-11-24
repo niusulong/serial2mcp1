@@ -28,6 +28,7 @@ class SerialToolFacade:
 
         # 初始化驱动
         try:
+            self.logger.info("开始初始化串口工具门面")
             self.driver.initialize()
             self.logger.info("串口工具门面初始化完成")
         except Exception as e:

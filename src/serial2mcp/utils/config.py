@@ -200,7 +200,8 @@ class ConfigManager:
         max_file_size_env = os.getenv('LOG_MAX_FILE_SIZE_MB')
         if max_file_size_env:
             self.config.logging.max_file_size_mb = int(max_file_size_env)
-        self.config.logging.level = os.getenv('LOG_LEVEL', self.config.logging.level)
+        # 检查两个环境变量名称：SERIAL2MCP_LOG_LEVEL（配置文件中使用的）和LOG_LEVEL（代码默认的）
+        self.config.logging.level = os.getenv('SERIAL2MCP_LOG_LEVEL', os.getenv('LOG_LEVEL', self.config.logging.level))
 
     def save_to_file(self, file_path: str) -> None:
         """

@@ -8,7 +8,7 @@ from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.server.models import InitializationOptions
 from .facade.tool_facade import SerialToolFacade
-from .utils.logger import setup_logging
+from .utils.logger import setup_logging, get_logger
 from .utils.config import config_manager
 from .utils.serial_data_logger import serial_data_logger_manager
 import mcp.types as types
@@ -28,6 +28,10 @@ async def main():
         log_dir=config.logging.tool_log_path,
         disable_console=True  # MCP服务器不应输出到控制台
     )
+
+    # 创建日志记录器并记录服务器启动信息
+    logger = get_logger("mcp_server_main")
+    logger.info(f"MCP服务器开始启动", config_logging=config.logging)
 
     # 创建工具门面实例
     facade = SerialToolFacade()

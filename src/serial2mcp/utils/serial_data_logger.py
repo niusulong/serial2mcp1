@@ -39,30 +39,41 @@ class SerialDataLogger:
         with self.file_lock:
             if self.is_logging:
                 return
-            
+
             # 生成带时间戳的文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             hex_filename = f"{self.port_name}_{timestamp}.hex"
             txt_filename = f"{self.port_name}_{timestamp}.txt"
-            
+
             # 创建日期子目录
             date_dir = self.log_dir / datetime.now().strftime("%Y") / datetime.now().strftime("%m") / datetime.now().strftime("%d")
             date_dir.mkdir(parents=True, exist_ok=True)
-            
+
+            # 确保目录路径存在
+            date_dir.parent.mkdir(parents=True, exist_ok=True)
+
             # 打开日志文件
             self.hex_file_path = date_dir / hex_filename
             self.txt_file_path = date_dir / txt_filename
-            
-            self.hex_file = open(self.hex_file_path, 'a', encoding='utf-8')
-            self.txt_file = open(self.txt_file_path, 'a', encoding='utf-8')
-            
+
+            # 确保文件路径的父目录存在
+            self.hex_file_path.parent.mkdir(parents=True, exist_ok=True)
+            self.txt_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            try:
+                self.hex_file = open(self.hex_file_path, 'a', encoding='utf-8')
+                self.txt_file = open(self.txt_file_path, 'a', encoding='utf-8')
+            except Exception as e:
+                print(f"无法创建日志文件 {self.hex_file_path} 或 {self.txt_file_path}: {e}", file=sys.stderr)
+                raise
+
             self.is_logging = True
-            
+
             # 记录开始日志
             start_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             hex_start_entry = f"[{start_time_str}] *** LOG START ***\n"
             txt_start_entry = f"[{start_time_str}] *** LOG START ***\n"
-            
+
             self.hex_file.write(hex_start_entry)
             self.txt_file.write(txt_start_entry)
             self.hex_file.flush()

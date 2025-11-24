@@ -47,6 +47,7 @@ class SerialDriver:
     def initialize(self) -> None:
         """初始化驱动"""
         try:
+            self.logger.info("开始初始化串口驱动")
             self.connection_manager.initialize()
             self.background_reader.initialize(
                 connection_manager=self.connection_manager,
@@ -74,12 +75,16 @@ class SerialDriver:
             raise DriverNotInitializedError("驱动未初始化")
 
         try:
+            self.logger.info(f"尝试连接串口: {port}")
             # 如果没有指定波特率，使用配置中的默认值
             if baudrate is None:
                 baudrate = self.config.serial.baudrate
 
             self.connection_manager.connect(port, baudrate)
+            self.logger.info(f"串口物理连接成功: {port}@{baudrate}")
+
             self.background_reader.start(port=port)  # 传递端口名称给后台读取器
+            self.logger.info(f"后台读取线程已为 {port} 启动")
 
             self._is_connected = True
             metrics_collector.record_connection_attempt(success=True)
@@ -136,7 +141,8 @@ class SerialDriver:
             metrics_collector.record_send(len(data))
 
             self.connection_manager.write(data)
-            self.logger.debug(f"发送数据: {data.hex() if is_hex else data.decode('utf-8', errors='replace')}")
+            decoded_data = data.decode('utf-8', errors='replace') if not is_hex else data.hex()
+            self.logger.debug(f"发送数据: {len(data)} 字节, 内容: {decoded_data}")
 
             # 根据策略获取响应
             if wait_policy == 'none':

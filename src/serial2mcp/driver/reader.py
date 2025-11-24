@@ -69,15 +69,19 @@ class BackgroundReader:
 
         if port:
             self.current_port = port
+            self.logger.info(f"为端口 {port} 启动后台接收线程")
             # 启动串口通信日志记录
             if self.config.logging.com_log_enabled:
+                self.logger.info(f"为端口 {port} 启动通信日志记录")
                 serial_data_logger_manager.start_logging(port)
+            else:
+                self.logger.info(f"串口通信日志记录已禁用 (COM_LOG_ENABLED={self.config.logging.com_log_enabled})")
 
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
         self._is_running = True
-        self.logger.info("后台接收线程已启动")
+        self.logger.info(f"后台接收线程已为 {port} 启动")
 
     def stop(self) -> None:
         """停止后台接收线程"""
@@ -127,17 +131,20 @@ class BackgroundReader:
                         if self.sync_mode_event.is_set():
                             # 同步模式：直接发送到同步响应队列
                             try:
+                                self.logger.debug(f"接收到同步模式数据: {len(data)} 字节")
                                 self.sync_response_queue.put_nowait(data)
                                 self.logger.debug(f"同步模式：发送 {len(data)} 字节到响应队列: {data!r}")
 
                                 # 如果异步缓冲区有数据，需要强制推送到异步队列
                                 if self._async_buffer:
+                                    self.logger.debug("同步模式下刷新异步缓冲区")
                                     self._flush_async_buffer()
 
                             except queue.Full:
                                 self.logger.error("同步响应队列已满")
                         else:
                             # 异步模式：添加到异步缓冲区
+                            self.logger.debug(f"接收到异步模式数据: {len(data)} 字节")
                             self._async_buffer.extend(data)
                             self._last_receive_time = time.time()
                             self.logger.debug(f"异步模式：添加 {len(data)} 字节到异步缓冲区: {data!r}")

@@ -37,6 +37,9 @@ def setup_logging(level: str = "INFO", format_type: str = "console", enable_file
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_file_path = date_path / f"serial-agent-mcp_{timestamp}.log"
 
+        # 确保日志文件目录存在
+        log_file_path.parent.mkdir(parents=True, exist_ok=True)
+
     # 配置结构化日志
     if format_type == "json":
         # JSON 格式日志配置
@@ -85,12 +88,17 @@ def setup_logging(level: str = "INFO", format_type: str = "console", enable_file
         handlers.append(logging.StreamHandler(sys.stdout))
 
     # 添加文件处理器（如果启用文件日志）
-    if enable_file_logging:
+    if enable_file_logging and 'log_file_path' in locals():
         # 对于文件日志使用标准logging格式，避免与structlog冲突
-        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
-        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(file_formatter)
-        handlers.append(file_handler)
+        try:
+            file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+            file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            file_handler.setFormatter(file_formatter)
+            handlers.append(file_handler)
+        except Exception as e:
+            print(f"无法创建日志文件 {log_file_path}: {e}", file=sys.stderr)
+            # 如果无法创建日志文件，仍然继续运行，但禁用文件日志
+            enable_file_logging = False
 
     # 配置根日志记录器
     logging.basicConfig(
