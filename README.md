@@ -110,6 +110,28 @@
    - 无输入参数
    - 返回: URC消息列表
 
+## 配置说明
+
+在使用此MCP服务器时，需要在MCP客户端配置中添加如下配置：
+
+```json
+{
+  "mcpServers": {
+    "serial-agent-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "serial2mcp.main"
+      ],
+      "env": {
+        "PYTHONPATH": "D:\\niusulong\\serial2mcp--1\\serial2mcp\\src",
+        "SERIAL2MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
 ## 项目目录结构
 
 ```
