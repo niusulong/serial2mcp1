@@ -54,12 +54,12 @@
   - `main.py`: MCP服务器入口点，定义和注册可用工具
   - `server.py`: (预留) MCP服务器主类
 
-#### 2. 适配层
-- **职责**: 将MCP工具调用转换为底层驱动操作，处理参数验证和异常转换
+#### 2. 门面层
+- **职责**: 为MCP协议提供统一的工具接口，协调和管理工具模块，处理参数验证和异常转换
 - **主要组件**:
-  - `adapter/wrapper.py`: SerialToolWrapper - 串口工具包装器
-  - `adapter/converter.py`: ParameterConverter - 参数转换器
-  - `adapter/exception_handler.py`: ExceptionHandler - 异常处理器
+  - `facade/tool_facade.py`: SerialToolFacade - 串口工具门面
+  - `facade/parameter_converter.py`: ParameterConverter - 参数转换器
+  - `facade/exception_handler.py`: ExceptionHandler - 异常处理器
 
 #### 3. 核心驱动层
 - **职责**: 串口连接管理、数据收发、并发控制

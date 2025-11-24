@@ -7,7 +7,7 @@ import sys
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 from mcp.server.models import InitializationOptions
-from .adapter.wrapper import SerialToolWrapper
+from .facade.tool_facade import SerialToolFacade
 from .utils.logger import setup_logging
 from .utils.config import config_manager
 from .utils.serial_data_logger import serial_data_logger_manager
@@ -29,8 +29,8 @@ async def main():
         disable_console=True  # MCP服务器不应输出到控制台
     )
 
-    # 创建工具包装器实例
-    wrapper = SerialToolWrapper()
+    # 创建工具门面实例
+    facade = SerialToolFacade()
 
     # 创建MCP服务器
     server = Server(
@@ -142,13 +142,13 @@ async def main():
         """处理 call_tool 请求"""
         try:
             if name == "list_ports":
-                result = wrapper.list_ports()
+                result = facade.list_ports()
             elif name == "configure_connection":
-                result = wrapper.configure_connection(**arguments)
+                result = facade.configure_connection(**arguments)
             elif name == "send_data":
-                result = wrapper.send_data(**arguments)
+                result = facade.send_data(**arguments)
             elif name == "read_urc":
-                result = wrapper.read_urc()
+                result = facade.read_urc()
             else:
                 return [
                     types.TextContent(

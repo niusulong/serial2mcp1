@@ -17,8 +17,9 @@
 ```mermaid
 graph LR
     LLM[大模型 Client<br>Claude/ChatGPT] -- JSON-RPC --> MCP[MCP Server]
-    MCP -- Method Call --> Wrapper[工具适配层<br>Tool Wrapper]
-    Wrapper -- Call --> Driver[全局单例<br>SerialDriver]
+    MCP -- Method Call --> Facade[门面层<br>Tool Facade]
+    Facade -- Tool Call --> Tools[工具层<br>Tools Layer]
+    Tools -- Call --> Driver[全局单例<br>SerialDriver]
     Driver -- Bytes --> HW[物理串口]
 ```
 
@@ -31,14 +32,14 @@ graph LR
 
 ### 1.3 工具映射逻辑 (Tool Mapping)
 
-适配层负责将 JSON Schema 参数转换为 Python 驱动的具体方法调用。
+门面层和工具层共同负责将 JSON Schema 参数转换为 Python 驱动的具体方法调用。
 
-| MCP 工具名 | 参数解析逻辑 | 驱动调用 (SerialDriver) |
-|-----------|------------|------------------------|
-| list_ports | 直接调用 pyserial 库函数 | serial.tools.list_ports.comports() |
-| configure_connection | if action == "open" <br> driver.connect(port, baudrate)<br>if action == "close" <br> driver.disconnect() | driver.connect()<br>driver.disconnect() |
-| send_data | 1. 解码 payload (Hex str -> bytes)<br>2. driver.send(data, wait_policy, **kwargs) | driver.send_data()<br>Case A: driver._receive_until_keyword(...)<br>Case B: driver._receive_until_timeout(...)<br>Case C: driver._receive_at_response(...)<br>Case D: Direct send without wait |
-| read_urc | 无 | driver.get_urc_messages() |
+| MCP 工具名 | 参数解析逻辑 | 工具调用 | 驱动调用 (SerialDriver) |
+|-----------|------------|---------|------------------------|
+| list_ports | 通过 SerialToolFacade 调用 ConnectionTool | facade.tool_facade.SerialToolFacade.list_ports() → tools.connection.ConnectionTool.list_ports() | serial.tools.list_ports.comports() |
+| configure_connection | 通过 SerialToolFacade 调用 ConnectionTool 解析参数 <br>if action == "open" <br> driver.connect(port, baudrate)<br>if action == "close" <br> driver.disconnect() | facade.tool_facade.SerialToolFacade.configure_connection() → tools.connection.ConnectionTool.configure_connection() | driver.connect()<br>driver.disconnect() |
+| send_data | 1. 通过 SerialToolFacade 调用 CommunicationTool 解码 payload (Hex str -> bytes)<br>2. 通过 CommunicationTool 调用 driver.send(data, wait_policy, **kwargs) | facade.tool_facade.SerialToolFacade.send_data() → tools.communication.CommunicationTool.send_data() | driver.send_data()<br>Case A: driver._receive_until_keyword(...)<br>Case B: driver._receive_until_timeout(...)<br>Case C: driver._receive_at_response(...)<br>Case D: Direct send without wait |
+| read_urc | 通过 SerialToolFacade 调用 URCTool | facade.tool_facade.SerialToolFacade.read_urc() → tools.urc.URCTool.read_urc() | driver.get_urc_messages() |
 
 ## 2. 系统提示词设计 (The System Prompt)
 
@@ -157,7 +158,7 @@ graph LR
 当前系统采用分层架构设计，主要包含以下组件：
 
 - **MCP Server**: 使用官方 `mcp` 库实现，通过 `main.py` 作为入口点
-- **Tool Adapter (Wrapper)**: `SerialToolWrapper` 类，实现了工具接口到驱动方法的映射
+- **Tool Facade**: `SerialToolFacade` 类，提供了统一的工具接口并协调各工具模块
 - **Parameter Converter**: `ParameterConverter` 类，负责参数验证和转换
 - **Exception Handler**: `ExceptionHandler` 类，统一处理异常并返回标准格式
 - **Core Driver**: `SerialDriver` 类，实现串口通信核心逻辑

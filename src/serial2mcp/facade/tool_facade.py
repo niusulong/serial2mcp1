@@ -1,6 +1,6 @@
 """
-工具包装器
-将串口驱动功能适配为 MCP 工具接口
+工具门面
+提供统一的MCP工具接口
 """
 from typing import Dict, Any
 from ..utils.logger import get_logger
@@ -10,15 +10,15 @@ from ..tools.communication import CommunicationTool
 from ..tools.urc import URCTool
 
 
-class SerialToolWrapper:
+class SerialToolFacade:
     """
-    串口工具包装器
-    将底层串口驱动功能封装为MCP协议兼容的工具接口
+    串口工具门面
+    为MCP协议提供统一的工具接口，协调各个具体工具模块
     """
 
     def __init__(self):
-        """初始化工具包装器"""
-        self.logger = get_logger("serial_tool_wrapper")
+        """初始化工具门面"""
+        self.logger = get_logger("serial_tool_facade")
         self.driver = SerialDriver()
 
         # 初始化各个工具模块
@@ -29,9 +29,9 @@ class SerialToolWrapper:
         # 初始化驱动
         try:
             self.driver.initialize()
-            self.logger.info("串口工具包装器初始化完成")
+            self.logger.info("串口工具门面初始化完成")
         except Exception as e:
-            self.logger.error(f"串口工具包装器初始化失败: {e}")
+            self.logger.error(f"串口工具门面初始化失败: {e}")
             raise
 
     def list_ports(self) -> Dict[str, Any]:
