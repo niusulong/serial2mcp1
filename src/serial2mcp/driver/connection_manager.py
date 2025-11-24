@@ -8,6 +8,7 @@ from typing import Optional
 from ..utils.logger import get_logger
 from ..utils.exceptions import SerialConnectionError, SerialConfigurationError
 from ..utils.config import config_manager
+from ..utils.serial_data_logger import serial_data_logger_manager
 
 
 class ConnectionManager:
@@ -19,6 +20,7 @@ class ConnectionManager:
         self.config = config_manager.get_config()
         self.serial_port: Optional[serial.Serial] = None
         self._is_connected = False
+        self.current_port = None  # 当前连接的端口名称
 
     def initialize(self) -> None:
         """初始化连接管理器"""
@@ -55,6 +57,7 @@ class ConnectionManager:
             )
 
             self._is_connected = True
+            self.current_port = port  # 记录当前连接的端口
             self.logger.info(f"串口连接成功: {port}@{baudrate}")
 
         except serial.SerialException as e:
@@ -70,11 +73,13 @@ class ConnectionManager:
             try:
                 self.serial_port.close()
                 self._is_connected = False
+                self.current_port = None  # 清除当前端口
                 self.logger.info(f"串口 {self.serial_port.port} 已断开")
             except Exception as e:
                 self.logger.error(f"断开串口连接时发生错误: {e}")
                 # 即使出错也设置为未连接状态
                 self._is_connected = False
+                self.current_port = None
             finally:
                 self.serial_port = None
         else:
@@ -96,6 +101,11 @@ class ConnectionManager:
         try:
             bytes_written = self.serial_port.write(data)
             self.serial_port.flush()  # 确保数据被发送
+
+            # 记录发送的数据到通信日志
+            if self.current_port and self.config.logging.com_log_enabled:
+                serial_data_logger_manager.log_data(self.current_port, 'TX', data)
+
             self.logger.debug(f"写入 {bytes_written} 字节数据: {data.hex()}")
             return bytes_written
         except serial.SerialException as e:

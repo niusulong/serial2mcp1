@@ -79,7 +79,7 @@ class SerialDriver:
                 baudrate = self.config.serial.baudrate
 
             self.connection_manager.connect(port, baudrate)
-            self.background_reader.start()
+            self.background_reader.start(port=port)  # 传递端口名称给后台读取器
 
             self._is_connected = True
             metrics_collector.record_connection_attempt(success=True)
@@ -573,3 +573,12 @@ class SerialDriver:
     def reset_performance_metrics(self) -> None:
         """重置性能指标"""
         metrics_collector.reset_metrics()
+
+    def cleanup(self) -> None:
+        """清理资源，停止所有日志记录"""
+        # 停止后台读取线程
+        self.background_reader.stop()
+
+        # 停止所有串口通信日志记录
+        from ..utils.serial_data_logger import serial_data_logger_manager
+        serial_data_logger_manager.stop_all_logging()

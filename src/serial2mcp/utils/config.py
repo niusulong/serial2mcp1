@@ -33,6 +33,18 @@ class MCPConfig:
 
 
 @dataclass
+class LoggingConfig:
+    """日志配置数据类"""
+    com_log_enabled: bool = True  # 启用串口通信日志
+    tool_log_enabled: bool = True  # 启用工具运行日志
+    com_log_path: str = "logs/com_log"  # 串口日志存储路径
+    tool_log_path: str = "logs/tool_log"  # 工具日志存储路径
+    retention_days: int = 30  # 日志保留天数
+    max_file_size_mb: int = 10  # 最大文件大小MB
+    level: str = "INFO"  # 日志级别
+
+
+@dataclass
 class DriverConfig:
     """驱动配置数据类"""
     idle_timeout: float = 0.1  # 空闲超时时间（秒）
@@ -49,6 +61,7 @@ class AppConfig:
     serial: SerialConfig = None
     mcp: MCPConfig = None
     driver: DriverConfig = None
+    logging: LoggingConfig = None
 
     def __post_init__(self):
         if self.serial is None:
@@ -57,6 +70,8 @@ class AppConfig:
             self.mcp = MCPConfig()
         if self.driver is None:
             self.driver = DriverConfig()
+        if self.logging is None:
+            self.logging = LoggingConfig()
 
 
 class ConfigManager:
@@ -125,6 +140,19 @@ class ConfigManager:
                     reconnect_delay=driver_data.get('reconnect_delay', 1.0)
                 )
 
+            # 加载日志配置
+            if 'logging' in data:
+                log_data = data['logging']
+                self.config.logging = LoggingConfig(
+                    com_log_enabled=log_data.get('com_log_enabled', True),
+                    tool_log_enabled=log_data.get('tool_log_enabled', True),
+                    com_log_path=log_data.get('com_log_path', 'logs/com_log'),
+                    tool_log_path=log_data.get('tool_log_path', 'logs/tool_log'),
+                    retention_days=log_data.get('retention_days', 30),
+                    max_file_size_mb=log_data.get('max_file_size_mb', 10),
+                    level=log_data.get('level', 'INFO')
+                )
+
         except Exception as e:
             print(f"从文件加载配置时出错: {e}")
             # 使用默认配置
@@ -161,6 +189,19 @@ class ConfigManager:
         if max_buffer_env:
             self.config.driver.max_buffer_size = int(max_buffer_env)
 
+        # 日志相关环境变量
+        self.config.logging.com_log_enabled = os.getenv('COM_LOG_ENABLED', str(self.config.logging.com_log_enabled)).lower() == 'true'
+        self.config.logging.tool_log_enabled = os.getenv('TOOL_LOG_ENABLED', str(self.config.logging.tool_log_enabled)).lower() == 'true'
+        self.config.logging.com_log_path = os.getenv('COM_LOG_PATH', self.config.logging.com_log_path)
+        self.config.logging.tool_log_path = os.getenv('TOOL_LOG_PATH', self.config.logging.tool_log_path)
+        retention_days_env = os.getenv('LOG_RETENTION_DAYS')
+        if retention_days_env:
+            self.config.logging.retention_days = int(retention_days_env)
+        max_file_size_env = os.getenv('LOG_MAX_FILE_SIZE_MB')
+        if max_file_size_env:
+            self.config.logging.max_file_size_mb = int(max_file_size_env)
+        self.config.logging.level = os.getenv('LOG_LEVEL', self.config.logging.level)
+
     def save_to_file(self, file_path: str) -> None:
         """
         保存配置到文件
@@ -171,7 +212,8 @@ class ConfigManager:
         config_dict = {
             'serial': asdict(self.config.serial),
             'mcp': asdict(self.config.mcp),
-            'driver': asdict(self.config.driver)
+            'driver': asdict(self.config.driver),
+            'logging': asdict(self.config.logging)
         }
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)

@@ -6,20 +6,36 @@ import structlog
 import logging
 import sys
 from typing import Any
+from datetime import datetime
+from pathlib import Path
+import os
 
 
-def setup_logging(level: str = "INFO", format_type: str = "json") -> None:
+def setup_logging(level: str = "INFO", format_type: str = "console", enable_file_logging: bool = True, log_dir: str = "logs/tool_log", disable_console: bool = True) -> None:
     """
     配置项目日志系统
 
     Args:
         level: 日志级别 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         format_type: 日志格式类型 ("json", "console")
+        enable_file_logging: 是否启用文件日志
+        log_dir: 日志文件存储目录
+        disable_console: 是否禁用控制台输出（对于MCP服务器应该设为True）
     """
     # 设置日志级别
     numeric_level = getattr(logging, level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f'Invalid log level: {level}')
+
+    # 创建日志目录
+    if enable_file_logging:
+        log_path = Path(log_dir)
+        date_path = log_path / datetime.now().strftime("%Y") / datetime.now().strftime("%m") / datetime.now().strftime("%d")
+        date_path.mkdir(parents=True, exist_ok=True)
+
+        # 生成带时间戳的日志文件名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_file_path = date_path / f"serial-agent-mcp_{timestamp}.log"
 
     # 配置结构化日志
     if format_type == "json":
@@ -42,7 +58,7 @@ def setup_logging(level: str = "INFO", format_type: str = "json") -> None:
             cache_logger_on_first_use=True,
         )
     else:
-        # 控制台格式日志配置
+        # 控制台格式日志配置（对于MCP，我们仍然配置格式，但可能不需要实际输出到控制台）
         structlog.configure(
             processors=[
                 structlog.contextvars.merge_contextvars,
@@ -61,13 +77,26 @@ def setup_logging(level: str = "INFO", format_type: str = "json") -> None:
             cache_logger_on_first_use=True,
         )
 
+    # 配置根日志记录器，可以选择性地输出到控制台或仅输出到文件
+    handlers = []
+
+    # 如果不是MCP服务器环境，可以添加控制台处理器
+    if not disable_console:
+        handlers.append(logging.StreamHandler(sys.stdout))
+
+    # 添加文件处理器（如果启用文件日志）
+    if enable_file_logging:
+        # 对于文件日志使用标准logging格式，避免与structlog冲突
+        file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(file_formatter)
+        handlers.append(file_handler)
+
     # 配置根日志记录器
     logging.basicConfig(
         level=numeric_level,
         format="%(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ],
+        handlers=handlers,
         force=True  # 强制重新配置
     )
 

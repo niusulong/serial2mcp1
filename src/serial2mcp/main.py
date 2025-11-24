@@ -9,24 +9,48 @@ from mcp.server.stdio import stdio_server
 from mcp.server.models import InitializationOptions
 from .adapter.wrapper import SerialToolWrapper
 from .utils.logger import setup_logging
+from .utils.config import config_manager
+from .utils.serial_data_logger import serial_data_logger_manager
 import mcp.types as types
+import atexit
 
 
 async def main():
     """主函数 - 使用官方mcp库启动服务器"""
-    # 初始化日志
-    setup_logging(level="INFO")
-    
+    # 获取配置
+    config = config_manager.get_config()
+
+    # 初始化日志 - 只写入文件，不在控制台输出
+    setup_logging(
+        level=config.logging.level,
+        format_type="console",  # 可以根据需要设置为 "json"
+        enable_file_logging=config.logging.tool_log_enabled,
+        log_dir=config.logging.tool_log_path,
+        disable_console=True  # MCP服务器不应输出到控制台
+    )
+
     # 创建工具包装器实例
     wrapper = SerialToolWrapper()
-    
+
     # 创建MCP服务器
     server = Server(
         name="serial-agent-mcp",
         version="1.0.0",
         instructions="智能串口 MCP 工具，用于与串口设备通信"
     )
-    
+
+    # 注册退出时的清理函数
+    def cleanup_resources():
+        """在程序退出时清理资源"""
+        try:
+            # 停止所有串口通信日志记录
+            serial_data_logger_manager.stop_all_logging()
+            print("已清理日志资源", file=sys.stderr)  # 使用stderr输出清理信息
+        except Exception as e:
+            print(f"清理资源时出错: {e}", file=sys.stderr)
+
+    atexit.register(cleanup_resources)
+
     # 定义并注册 list_tools 处理器
     @server.list_tools()
     async def handle_list_tools(request: types.ListToolsRequest) -> types.ListToolsResult:
@@ -132,7 +156,7 @@ async def main():
                         text=f"未知工具: {name}"
                     )
                 ], {"success": False, "error": f"未知工具: {name}"}
-            
+
             # 将结果包装为适当的MCP内容格式
             if result.get("success", True):
                 # 成功时返回内容
@@ -146,7 +170,7 @@ async def main():
                 # 失败时返回错误消息
                 return [
                     types.TextContent(
-                        type="text", 
+                        type="text",
                         text=f"错误: {result.get('error_message', '未知错误')}"
                     )
                 ], result

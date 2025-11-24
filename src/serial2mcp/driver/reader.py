@@ -11,6 +11,7 @@ from ..utils.logger import get_logger
 from ..utils.exceptions import SerialConnectionError
 from ..utils.config import config_manager
 from ..utils.metrics import metrics_collector
+from ..utils.serial_data_logger import serial_data_logger_manager
 
 
 class BackgroundReader:
@@ -28,6 +29,7 @@ class BackgroundReader:
         self.sync_mode_event = None
         self.sync_response_queue = None
         self.urc_queue = None
+        self.current_port = None  # 当前连接的端口
 
         # 本地缓冲区和状态
         self._urc_buffer = bytearray()
@@ -54,11 +56,22 @@ class BackgroundReader:
         self.urc_queue = urc_queue
         self.logger.info("后台接收线程初始化完成")
 
-    def start(self) -> None:
-        """启动后台接收线程"""
+    def start(self, port: str = None) -> None:
+        """
+        启动后台接收线程
+
+        Args:
+            port: 当前连接的端口名称，用于日志记录
+        """
         if self._is_running:
             self.logger.warning("后台接收线程已在运行中")
             return
+
+        if port:
+            self.current_port = port
+            # 启动串口通信日志记录
+            if self.config.logging.com_log_enabled:
+                serial_data_logger_manager.start_logging(port)
 
         self.stop_event.clear()
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -76,6 +89,12 @@ class BackgroundReader:
             self.thread.join(timeout=2.0)  # 等待最多2秒让线程结束
 
         self._is_running = False
+
+        # 停止串口通信日志记录
+        if self.current_port and self.config.logging.com_log_enabled:
+            serial_data_logger_manager.stop_logging(self.current_port)
+            self.current_port = None
+
         self.logger.info("后台接收线程已停止")
 
     def _run(self) -> None:
@@ -99,6 +118,10 @@ class BackgroundReader:
                     if data:
                         # 记录接收数据到性能指标
                         metrics_collector.record_receive(len(data))
+
+                        # 记录接收到的数据到通信日志
+                        if self.current_port and self.config.logging.com_log_enabled:
+                            serial_data_logger_manager.log_data(self.current_port, 'RX', data)
 
                         # 根据当前模式决定数据流向
                         if self.sync_mode_event.is_set():
