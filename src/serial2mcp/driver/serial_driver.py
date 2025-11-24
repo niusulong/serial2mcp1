@@ -32,10 +32,10 @@ class SerialDriver:
         self.background_reader = BackgroundReader()
         self.data_processor = DataProcessor()
 
-        # 同步模式标志 - 用于区分同步响应和异步URC
+        # 同步模式标志 - 用于区分同步响应和异步消息
         self._sync_mode = threading.Event()
         self._sync_response_queue = queue.Queue()
-        self._urc_queue = queue.Queue(maxsize=self.config.driver.urc_buffer_size)
+        self._async_queue = queue.Queue(maxsize=self.config.driver.urc_buffer_size)
 
         # 驱动状态
         self._is_initialized = False
@@ -52,7 +52,7 @@ class SerialDriver:
                 connection_manager=self.connection_manager,
                 sync_mode_event=self._sync_mode,
                 sync_response_queue=self._sync_response_queue,
-                urc_queue=self._urc_queue
+                async_queue=self._async_queue
             )
             self.data_processor.initialize()
 
@@ -145,7 +145,7 @@ class SerialDriver:
                 return {
                     'success': True,
                     'message': '数据已发送，不等待响应',
-                    'pending_urc_count': self.get_pending_urc_count()
+                    'pending_async_count': self.get_pending_async_count()
                 }
             elif wait_policy in ['keyword', 'timeout', 'at_command']:
                 # 清空同步响应队列以避免之前的残留数据
@@ -239,7 +239,7 @@ class SerialDriver:
                 'is_hex': is_hex,
                 'found_stop_pattern': stop_pattern_bytes in received_data,
                 'bytes_received': len(received_data),
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
         else:
@@ -249,7 +249,7 @@ class SerialDriver:
                 'is_hex': False,
                 'found_stop_pattern': False,
                 'bytes_received': 0,
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
 
@@ -286,7 +286,7 @@ class SerialDriver:
                 'raw_data': received_data,
                 'is_hex': is_hex,
                 'bytes_received': len(received_data),
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
         else:
@@ -295,7 +295,7 @@ class SerialDriver:
                 'raw_data': b'',
                 'is_hex': False,
                 'bytes_received': 0,
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
 
@@ -332,7 +332,7 @@ class SerialDriver:
                 'raw_data': received_data,
                 'is_hex': is_hex,
                 'bytes_received': len(received_data),
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
         else:
@@ -341,7 +341,7 @@ class SerialDriver:
                 'raw_data': b'',
                 'is_hex': False,
                 'bytes_received': 0,
-                'pending_urc_count': self.get_pending_urc_count(),
+                'pending_async_count': self.get_pending_async_count(),
                 'success': True
             }
 
@@ -497,54 +497,54 @@ class SerialDriver:
             'message': '数据已发送，不等待响应'
         }
 
-    def get_urc_messages(self, clear: bool = True) -> List[Dict[str, Any]]:
+    def get_async_messages(self, clear: bool = True) -> List[Dict[str, Any]]:
         """
-        获取URC消息
+        获取异步消息
 
         Args:
-            clear: 是否清空URC队列
+            clear: 是否清空异步消息队列
 
         Returns:
-            URC消息列表
+            异步消息列表
         """
-        urc_messages = []
+        async_messages = []
 
         while True:
             try:
                 if clear:
-                    urc_data = self._urc_queue.get_nowait()
+                    async_data = self._async_queue.get_nowait()
                 else:
-                    urc_data = self._urc_queue.get(timeout=0.1)
+                    async_data = self._async_queue.get(timeout=0.1)
 
-                # 处理URC数据
+                # 处理异步消息数据
                 try:
-                    decoded_data = urc_data.decode('utf-8')
+                    decoded_data = async_data.decode('utf-8')
                     is_hex = False
                 except UnicodeDecodeError:
-                    decoded_data = urc_data.hex()
+                    decoded_data = async_data.hex()
                     is_hex = True
 
-                urc_messages.append({
+                async_messages.append({
                     'data': decoded_data,
-                    'raw_data': urc_data,
+                    'raw_data': async_data,
                     'is_hex': is_hex,
                     'timestamp': time.time()
                 })
 
-                metrics_collector.record_urc_message()
+                metrics_collector.record_async_message()
             except queue.Empty:
                 break
 
-        return urc_messages
+        return async_messages
 
-    def get_pending_urc_count(self) -> int:
+    def get_pending_async_count(self) -> int:
         """
-        获取待处理的URC消息数量
+        获取待处理的异步消息数量
 
         Returns:
-            待处理URC消息数量
+            待处理异步消息数量
         """
-        return self._urc_queue.qsize()
+        return self._async_queue.qsize()
 
     def get_driver_status(self) -> Dict[str, Any]:
         """
@@ -557,7 +557,7 @@ class SerialDriver:
             'is_initialized': self._is_initialized,
             'is_connected': self.is_connected(),
             'sync_mode': self._sync_mode.is_set(),
-            'pending_urc_count': self.get_pending_urc_count(),
+            'pending_async_count': self.get_pending_async_count(),
             'sync_response_queue_size': self._sync_response_queue.qsize()
         }
 

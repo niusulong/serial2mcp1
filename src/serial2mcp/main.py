@@ -125,8 +125,8 @@ async def main():
                 }
             ),
             types.Tool(
-                name="read_urc",
-                description="读取后台缓冲区中积累的未处理消息（URC）。",
+                name="read_async_messages",
+                description="读取后台缓冲区中积累的异步消息。",
                 inputSchema={
                     "type": "object",
                     "properties": {},
@@ -147,8 +147,8 @@ async def main():
                 result = facade.configure_connection(**arguments)
             elif name == "send_data":
                 result = facade.send_data(**arguments)
-            elif name == "read_urc":
-                result = facade.read_urc()
+            elif name == "read_async_messages":
+                result = facade.read_async_messages()
             else:
                 return [
                     types.TextContent(

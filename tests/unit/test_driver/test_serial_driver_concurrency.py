@@ -81,8 +81,8 @@ class TestSerialDriverConcurrency:
                     data = f"{data_prefix}_{i}".encode()
                     if queue_type == "sync":
                         self.driver._sync_response_queue.put(data)
-                    else:  # urc
-                        self.driver._urc_queue.put(data)
+                    else:  # async
+                        self.driver._async_queue.put(data)
                     time.sleep(0.001)
             except Exception as e:
                 errors.append(f"生产者错误: {str(e)}")
@@ -94,8 +94,8 @@ class TestSerialDriverConcurrency:
                     try:
                         if queue_type == "sync":
                             data = self.driver._sync_response_queue.get(timeout=0.1)
-                        else:  # urc
-                            data = self.driver._urc_queue.get(timeout=0.1)
+                        else:  # async
+                            data = self.driver._async_queue.get(timeout=0.1)
                     except queue.Empty:
                         pass
                     time.sleep(0.001)
@@ -105,9 +105,9 @@ class TestSerialDriverConcurrency:
         # 创建生产者和消费者线程
         threads = []
         threads.append(threading.Thread(target=producer, args=("sync", "sync_data")))
-        threads.append(threading.Thread(target=producer, args=("urc", "urc_data")))
+        threads.append(threading.Thread(target=producer, args=("async", "async_data")))
         threads.append(threading.Thread(target=consumer, args=("sync",)))
-        threads.append(threading.Thread(target=consumer, args=("urc",)))
+        threads.append(threading.Thread(target=consumer, args=("async",)))
         
         # 启动所有线程
         for t in threads:
@@ -214,7 +214,7 @@ class TestSerialDriverConcurrency:
             connection_manager=mock_connection_manager,
             sync_mode_event=self.driver._sync_mode,
             sync_response_queue=self.driver._sync_response_queue,
-            urc_queue=self.driver._urc_queue
+            async_queue=self.driver._async_queue
         )
         
         def simulate_data_arrival():
@@ -263,45 +263,45 @@ class TestSerialDriverConcurrency:
         # 检查没有发生错误
         assert len(errors) == 0, f"后台接收线程安全测试发生错误: {errors}"
     
-    def test_concurrent_get_urc_messages(self):
-        """测试并发获取URC消息的安全性"""
+    def test_concurrent_get_async_messages(self):
+        """测试并发获取异步消息的安全性"""
         errors = []
-        
-        # 添加一些URC消息
+
+        # 添加一些异步消息
         for i in range(10):
-            self.driver._urc_queue.put(f"URC_{i}".encode())
-        
-        def get_urc_messages(thread_id, clear_flag):
-            """获取URC消息的线程函数"""
+            self.driver._async_queue.put(f"Async_{i}".encode())
+
+        def get_async_messages(thread_id, clear_flag):
+            """获取异步消息的线程函数"""
             try:
                 for i in range(3):
-                    messages = self.driver.get_urc_messages(clear=clear_flag)
+                    messages = self.driver.get_async_messages(clear=clear_flag)
                     time.sleep(0.001)
             except Exception as e:
                 errors.append((thread_id, str(e)))
-        
-        # 创建多个线程同时获取URC消息
+
+        # 创建多个线程同时获取异步消息
         threads = []
         for i in range(3):
             # 交替使用clear=True和clear=False
             clear_flag = i % 2 == 0
-            t = threading.Thread(target=get_urc_messages, args=(i, clear_flag))
+            t = threading.Thread(target=get_async_messages, args=(i, clear_flag))
             threads.append(t)
             t.start()
-        
+
         # 等待所有线程完成
         for t in threads:
             t.join()
-        
+
         # 检查没有发生错误
-        assert len(errors) == 0, f"并发获取URC消息发生错误: {errors}"
+        assert len(errors) == 0, f"并发获取异步消息发生错误: {errors}"
 
 
 class TestBackgroundReaderThreadSafety:
     """后台接收线程安全性测试"""
-    
-    def test_urc_buffer_thread_safety(self):
-        """测试URC缓冲区的线程安全性"""
+
+    def test_async_buffer_thread_safety(self):
+        """测试异步缓冲区的线程安全性"""
         reader = BackgroundReader()
         
         errors = []
@@ -312,10 +312,10 @@ class TestBackgroundReaderThreadSafety:
                 for i in range(10):
                     # 模拟添加数据到缓冲区
                     data = f"thread_{thread_id}_data_{i}".encode()
-                    reader._urc_buffer.extend(data)
-                    
+                    reader._async_buffer.extend(data)
+
                     # 模拟访问缓冲区状态
-                    size = len(reader._urc_buffer)
+                    size = len(reader._async_buffer)
                     time.sleep(0.001)
             except Exception as e:
                 errors.append((thread_id, str(e)))
@@ -325,7 +325,7 @@ class TestBackgroundReaderThreadSafety:
             try:
                 for i in range(10):
                     # 调用空闲超时检查方法
-                    reader._check_urc_idle_timeout()
+                    reader._check_async_idle_timeout()
                     time.sleep(0.001)
             except Exception as e:
                 errors.append((thread_id, str(e)))
@@ -345,4 +345,4 @@ class TestBackgroundReaderThreadSafety:
             t.join()
         
         # 检查没有发生错误
-        assert len(errors) == 0, f"URC缓冲区线程安全测试发生错误: {errors}"
+        assert len(errors) == 0, f"异步缓冲区线程安全测试发生错误: {errors}"

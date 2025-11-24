@@ -29,9 +29,9 @@ class PerformanceMetrics:
     successful_connections: int = 0
     failed_connections: int = 0
 
-    # URC 相关指标
-    urc_messages_processed: int = 0
-    urc_buffer_overflows: int = 0
+    # 异步消息相关指标
+    async_messages_processed: int = 0
+    async_buffer_overflows: int = 0
 
     # 延迟相关指标 (用于监控)
     last_update_time: float = 0.0
@@ -125,16 +125,16 @@ class MetricsCollector:
             self.metrics.connection_timeouts += 1
             self.metrics.last_update_time = time.time()
 
-    def record_urc_message(self) -> None:
-        """记录URC消息处理"""
+    def record_async_message(self) -> None:
+        """记录异步消息处理"""
         with self.lock:
-            self.metrics.urc_messages_processed += 1
+            self.metrics.async_messages_processed += 1
             self.metrics.last_update_time = time.time()
 
-    def record_urc_overflow(self) -> None:
-        """记录URC缓冲区溢出"""
+    def record_async_overflow(self) -> None:
+        """记录异步消息缓冲区溢出"""
         with self.lock:
-            self.metrics.urc_buffer_overflows += 1
+            self.metrics.async_buffer_overflows += 1
             self.metrics.last_update_time = time.time()
 
     def get_uptime(self) -> float:

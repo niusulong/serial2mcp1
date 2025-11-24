@@ -12,7 +12,7 @@ from .exceptions import (
     DataParsingError,
     TimeoutError,
     InvalidInputError,
-    URCHandlerError,
+    AsyncMessageHandlerError,
     DriverNotInitializedError
 )
 from .serial_data_logger import serial_data_logger_manager, SerialDataLogger, SerialDataLoggerManager
@@ -30,7 +30,7 @@ __all__ = [
     "DataParsingError",
     "TimeoutError",
     "InvalidInputError",
-    "URCHandlerError",
+    "AsyncMessageHandlerError",
     "DriverNotInitializedError",
     "serial_data_logger_manager",
     "SerialDataLogger",

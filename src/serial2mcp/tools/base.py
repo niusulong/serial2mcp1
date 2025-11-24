@@ -6,8 +6,6 @@ from typing import Dict, Any
 from ..utils.logger import get_logger
 from ..utils.exceptions import SerialConnectionError, SerialDataError, InvalidInputError
 from ..driver.serial_driver import SerialDriver
-from ..facade.parameter_converter import ParameterConverter
-from ..facade.exception_handler import ExceptionHandler
 
 
 class BaseTool:
@@ -16,6 +14,10 @@ class BaseTool:
     def __init__(self, driver: SerialDriver):
         self.driver = driver
         self.logger = get_logger(self.__class__.__name__.lower())
+
+        # 延迟导入以避免循环导入
+        from ..facade.parameter_converter import ParameterConverter
+        from ..facade.exception_handler import ExceptionHandler
         self.converter = ParameterConverter()
         self.exception_handler = ExceptionHandler()
 

@@ -6,11 +6,11 @@ Serial-Agent-MCP 工具模块的初始化文件
 from .base import BaseTool
 from .connection import ConnectionTool
 from .communication import CommunicationTool
-from .urc import URCTool
+from .async_message import AsyncMessageTool
 
 __all__ = [
     'BaseTool',
     'ConnectionTool',
     'CommunicationTool',
-    'URCTool'
+    'AsyncMessageTool'
 ]

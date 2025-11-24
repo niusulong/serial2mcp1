@@ -7,7 +7,7 @@ from ..utils.logger import get_logger
 from ..driver.serial_driver import SerialDriver
 from ..tools.connection import ConnectionTool
 from ..tools.communication import CommunicationTool
-from ..tools.urc import URCTool
+from ..tools.async_message import AsyncMessageTool
 
 
 class SerialToolFacade:
@@ -24,7 +24,7 @@ class SerialToolFacade:
         # 初始化各个工具模块
         self.connection_tool = ConnectionTool(self.driver)
         self.communication_tool = CommunicationTool(self.driver)
-        self.urc_tool = URCTool(self.driver)
+        self.async_message_tool = AsyncMessageTool(self.driver)
 
         # 初始化驱动
         try:
@@ -67,14 +67,14 @@ class SerialToolFacade:
         """
         return self.communication_tool.send_data(**kwargs)
 
-    def read_urc(self) -> Dict[str, Any]:
+    def read_async_messages(self) -> Dict[str, Any]:
         """
-        读取后台缓冲区中积累的未处理消息（URC）
+        读取后台缓冲区中积累的异步消息
 
         Returns:
-            URC消息列表的字典
+            异步消息列表的字典
         """
-        return self.urc_tool.read_urc()
+        return self.async_message_tool.read_async_messages()
 
     def get_driver_status(self) -> Dict[str, Any]:
         """

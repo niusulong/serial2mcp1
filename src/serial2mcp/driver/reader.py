@@ -28,11 +28,11 @@ class BackgroundReader:
         self.connection_manager = None
         self.sync_mode_event = None
         self.sync_response_queue = None
-        self.urc_queue = None
+        self.async_queue = None
         self.current_port = None  # 当前连接的端口
 
         # 本地缓冲区和状态
-        self._urc_buffer = bytearray()
+        self._async_buffer = bytearray()
         self._last_receive_time = time.time()
         self._is_running = False
 
@@ -40,7 +40,7 @@ class BackgroundReader:
                    connection_manager,
                    sync_mode_event: threading.Event,
                    sync_response_queue: queue.Queue,
-                   urc_queue: queue.Queue) -> None:
+                   async_queue: queue.Queue) -> None:
         """
         初始化后台接收线程的依赖
 
@@ -48,12 +48,12 @@ class BackgroundReader:
             connection_manager: 连接管理器实例
             sync_mode_event: 同步模式事件
             sync_response_queue: 同步响应队列
-            urc_queue: URC队列
+            async_queue: 异步消息队列
         """
         self.connection_manager = connection_manager
         self.sync_mode_event = sync_mode_event
         self.sync_response_queue = sync_response_queue
-        self.urc_queue = urc_queue
+        self.async_queue = async_queue
         self.logger.info("后台接收线程初始化完成")
 
     def start(self, port: str = None) -> None:
@@ -130,20 +130,20 @@ class BackgroundReader:
                                 self.sync_response_queue.put_nowait(data)
                                 self.logger.debug(f"同步模式：发送 {len(data)} 字节到响应队列: {data!r}")
 
-                                # 如果URC缓冲区有数据，需要强制推送到URC队列
-                                if self._urc_buffer:
-                                    self._flush_urc_buffer()
+                                # 如果异步缓冲区有数据，需要强制推送到异步队列
+                                if self._async_buffer:
+                                    self._flush_async_buffer()
 
                             except queue.Full:
                                 self.logger.error("同步响应队列已满")
                         else:
-                            # 异步模式（URC模式）：添加到URC缓冲区
-                            self._urc_buffer.extend(data)
+                            # 异步模式：添加到异步缓冲区
+                            self._async_buffer.extend(data)
                             self._last_receive_time = time.time()
-                            self.logger.debug(f"URC模式：添加 {len(data)} 字节到URC缓冲区: {data!r}")
+                            self.logger.debug(f"异步模式：添加 {len(data)} 字节到异步缓冲区: {data!r}")
 
-                # 检查URC缓冲区是否需要分包（基于空闲超时）
-                self._check_urc_idle_timeout()
+                # 检查异步缓冲区是否需要分包（基于空闲超时）
+                self._check_async_idle_timeout()
 
                 # 短暂休眠，避免过度占用CPU
                 time.sleep(0.005)  # 减少休眠时间以提高响应性
@@ -161,35 +161,35 @@ class BackgroundReader:
                     # 短暂休眠后继续尝试
                     time.sleep(0.5)
 
-        # 线程结束前，确保URC缓冲区中的数据被处理
-        self._flush_urc_buffer()
+        # 线程结束前，确保异步缓冲区中的数据被处理
+        self._flush_async_buffer()
         self.logger.debug("后台接收线程主循环结束")
 
-    def _check_urc_idle_timeout(self) -> None:
-        """检查URC空闲超时，如果超过设定时间没有新数据，则分包"""
+    def _check_async_idle_timeout(self) -> None:
+        """检查异步消息空闲超时，如果超过设定时间没有新数据，则分包"""
         current_time = time.time()
         idle_duration = current_time - self._last_receive_time
 
-        # 如果URC缓冲区有数据且空闲时间超过阈值，则进行分包
-        if (self._urc_buffer and
+        # 如果异步缓冲区有数据且空闲时间超过阈值，则进行分包
+        if (self._async_buffer and
             idle_duration >= self.config.driver.idle_timeout):
-            self._flush_urc_buffer()
+            self._flush_async_buffer()
 
-    def _flush_urc_buffer(self) -> None:
-        """刷新URC缓冲区，将数据发送到URC队列"""
-        if not self._urc_buffer:
+    def _flush_async_buffer(self) -> None:
+        """刷新异步缓冲区，将数据发送到异步消息队列"""
+        if not self._async_buffer:
             return
 
-        urc_data = bytes(self._urc_buffer)
-        self._urc_buffer.clear()
+        async_data = bytes(self._async_buffer)
+        self._async_buffer.clear()
 
         try:
-            # 尝试将URC数据放入队列
-            self.urc_queue.put_nowait(urc_data)
-            self.logger.debug(f"URC缓冲区数据已推送到队列: {len(urc_data)} 字节")
+            # 尝试将异步消息数据放入队列
+            self.async_queue.put_nowait(async_data)
+            self.logger.debug(f"异步缓冲区数据已推送到队列: {len(async_data)} 字节")
         except queue.Full:
-            self.logger.error("URC队列已满，数据丢失")
-            metrics_collector.record_urc_overflow()
+            self.logger.error("异步消息队列已满，数据丢失")
+            metrics_collector.record_async_overflow()
 
         # 更新最后接收时间
         self._last_receive_time = time.time()
@@ -212,7 +212,7 @@ class BackgroundReader:
         """
         return {
             'is_running': self.is_running(),
-            'urc_buffer_size': len(self._urc_buffer),
+            'async_buffer_size': len(self._async_buffer),
             'last_receive_time': self._last_receive_time,
             'idle_duration': time.time() - self._last_receive_time
         }

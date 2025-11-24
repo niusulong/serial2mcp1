@@ -13,7 +13,7 @@ from serial2mcp.utils.exceptions import (
     DataParsingError,
     TimeoutError as SerialTimeoutError,
     InvalidInputError,
-    URCHandlerError,
+    AsyncMessageHandlerError,
     DriverNotInitializedError
 )
 from serial2mcp.adapter.exception_handler import ExceptionHandler

@@ -43,8 +43,8 @@ class InvalidInputError(SerialAgentError):
     pass
 
 
-class URCHandlerError(SerialAgentError):
-    """URC处理相关异常"""
+class AsyncMessageHandlerError(SerialAgentError):
+    """异步消息处理相关异常"""
     pass
 
 

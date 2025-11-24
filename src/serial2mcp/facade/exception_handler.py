@@ -14,7 +14,7 @@ from ..utils.exceptions import (
     DataParsingError,
     TimeoutError as SerialTimeoutError,
     InvalidInputError,
-    URCHandlerError,
+    AsyncMessageHandlerError,
     DriverNotInitializedError
 )
 
@@ -92,11 +92,11 @@ class ExceptionHandler:
                 error_code="INVALID_INPUT_ERROR"
             )
 
-        elif isinstance(exception, URCHandlerError):
+        elif isinstance(exception, AsyncMessageHandlerError):
             return self._create_error_response(
-                "URC处理错误",
+                "异步消息处理错误",
                 str(exception),
-                error_code="URC_HANDLER_ERROR"
+                error_code="ASYNC_MESSAGE_HANDLER_ERROR"
             )
 
         elif isinstance(exception, DriverNotInitializedError):

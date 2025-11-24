@@ -235,25 +235,25 @@ class DataProcessor:
         """
         return text.replace('\r\n', '\n').replace('\r', '\n')
 
-    def extract_urc_messages(self, data: str) -> List[str]:
+    def extract_async_messages(self, data: str) -> List[str]:
         """
-        从数据中提取URC（未请求结果码）消息
+        从数据中提取异步消息
 
         Args:
             data: 输入数据
 
         Returns:
-            URC消息列表
+            异步消息列表
         """
-        # 常见URC模式：以+开头的消息
-        urc_pattern = re.compile(r'\+[A-Za-z][A-Za-z0-9_-]*:.*?(?=\n|$)', re.MULTILINE)
-        urc_messages = urc_pattern.findall(data)
+        # 常见异步消息模式：以+开头的消息
+        async_pattern = re.compile(r'\+[A-Za-z][A-Za-z0-9_-]*:.*?(?=\n|$)', re.MULTILINE)
+        async_messages = async_pattern.findall(data)
 
-        # 标准URC消息，如 ^、# 开头的
-        standard_urc_pattern = re.compile(r'[#^][A-Z][A-Z0-9_-]*:.*?(?=\n|$)', re.MULTILINE)
-        urc_messages.extend(standard_urc_pattern.findall(data))
+        # 标准异步消息，如 ^、# 开头的
+        standard_async_pattern = re.compile(r'[#^][A-Z][A-Z0-9_-]*:.*?(?=\n|$)', re.MULTILINE)
+        async_messages.extend(standard_async_pattern.findall(data))
 
-        return [self.normalize_line_endings(urc.strip()) for urc in urc_messages if urc.strip()]
+        return [self.normalize_line_endings(msg.strip()) for msg in async_messages if msg.strip()]
 
     def calculate_data_checksum(self, data: bytes, algorithm: str = 'crc16') -> str:
         """

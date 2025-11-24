@@ -31,8 +31,8 @@ class TestPerformanceMetrics:
         assert metrics['connection_timeouts'] == 0
         assert metrics['successful_connections'] == 0
         assert metrics['failed_connections'] == 0
-        assert metrics['urc_messages_processed'] == 0
-        assert metrics['urc_buffer_overflows'] == 0
+        assert metrics['async_messages_processed'] == 0
+        assert metrics['async_buffer_overflows'] == 0
     
     def test_record_send(self):
         """测试记录发送操作"""
@@ -93,27 +93,27 @@ class TestPerformanceMetrics:
         metrics = self.collector.get_metrics()
         assert metrics['connection_timeouts'] == initial_timeouts + 2
     
-    def test_record_urc_message(self):
-        """测试记录URC消息"""
-        initial_count = self.collector.get_metrics()['urc_messages_processed']
-        
-        # 记录几个URC消息
+    def test_record_async_message(self):
+        """测试记录异步消息"""
+        initial_count = self.collector.get_metrics()['async_messages_processed']
+
+        # 记录几个异步消息
         for i in range(5):
-            self.collector.record_urc_message()
-        
+            self.collector.record_async_message()
+
         metrics = self.collector.get_metrics()
-        assert metrics['urc_messages_processed'] == initial_count + 5
+        assert metrics['async_messages_processed'] == initial_count + 5
     
-    def test_record_urc_overflow(self):
-        """测试记录URC缓冲区溢出"""
-        initial_count = self.collector.get_metrics()['urc_buffer_overflows']
-        
+    def test_record_async_overflow(self):
+        """测试记录异步消息缓冲区溢出"""
+        initial_count = self.collector.get_metrics()['async_buffer_overflows']
+
         # 记录几次溢出
-        self.collector.record_urc_overflow()
-        self.collector.record_urc_overflow()
-        
+        self.collector.record_async_overflow()
+        self.collector.record_async_overflow()
+
         metrics = self.collector.get_metrics()
-        assert metrics['urc_buffer_overflows'] == initial_count + 2
+        assert metrics['async_buffer_overflows'] == initial_count + 2
     
     def test_response_time_tracking(self):
         """测试响应时间跟踪"""
@@ -169,8 +169,8 @@ class TestPerformanceMetrics:
         self.collector.record_error()
         self.collector.record_connection_attempt(success=True)
         self.collector.record_timeout()
-        self.collector.record_urc_message()
-        self.collector.record_urc_overflow()
+        self.collector.record_async_message()
+        self.collector.record_async_overflow()
         
         # 记录响应时间
         start = self.collector.start_timer()
@@ -189,8 +189,8 @@ class TestPerformanceMetrics:
         assert metrics['successful_connections'] == 0
         assert metrics['failed_connections'] == 0
         assert metrics['connection_timeouts'] == 0
-        assert metrics['urc_messages_processed'] == 0
-        assert metrics['urc_buffer_overflows'] == 0
+        assert metrics['async_messages_processed'] == 0
+        assert metrics['async_buffer_overflows'] == 0
         assert metrics['avg_response_time'] == 0.0
         assert metrics['total_uptime'] >= 0  # 正常时间应该从重置时间开始计算
     
@@ -210,7 +210,7 @@ class TestPerformanceMetrics:
                     if i % 4 == 0:
                         self.collector.record_connection_attempt(success=(i % 2 == 0))
                     if i % 5 == 0:
-                        self.collector.record_urc_message()
+                        self.collector.record_async_message()
                     
                     # 记录响应时间
                     start = self.collector.start_timer()

@@ -83,8 +83,8 @@ class CommunicationTool(BaseTool):
                     'bytes_received': 0
                 }
 
-            # 添加待处理URC计数
-            result['pending_urc_count'] = self.driver.get_pending_urc_count()
+            # 添加待处理异步消息计数
+            result['pending_async_count'] = self.driver.get_pending_async_count()
 
             # 标记操作成功
             result['success'] = True

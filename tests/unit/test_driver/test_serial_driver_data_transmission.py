@@ -132,33 +132,33 @@ class TestSerialDriverDataTransmission:
         assert result['success'] is True
         assert result['message'] == '数据已发送，不等待响应'
     
-    def test_get_urc_messages(self):
-        """测试获取URC消息"""
-        # 模拟向URC队列添加数据
-        urc_data1 = b"URC message 1"
-        urc_data2 = b"URC message 2"
-        self.driver._urc_queue.put(urc_data1)
-        self.driver._urc_queue.put(urc_data2)
-        
-        # 获取URC消息
-        urc_messages = self.driver.get_urc_messages(clear=True)
-        
-        assert len(urc_messages) == 2
-        assert urc_messages[0]['raw_data'] == urc_data1
-        assert urc_messages[1]['raw_data'] == urc_data2
+    def test_get_async_messages(self):
+        """测试获取异步消息"""
+        # 模拟向异步队列添加数据
+        async_data1 = b"Async message 1"
+        async_data2 = b"Async message 2"
+        self.driver._async_queue.put(async_data1)
+        self.driver._async_queue.put(async_data2)
+
+        # 获取异步消息
+        async_messages = self.driver.get_async_messages(clear=True)
+
+        assert len(async_messages) == 2
+        assert async_messages[0]['raw_data'] == async_data1
+        assert async_messages[1]['raw_data'] == async_data2
     
-    def test_get_pending_urc_count(self):
-        """测试获取待处理URC计数"""
-        # 添加一些URC消息
-        self.driver._urc_queue.put(b"URC1")
-        self.driver._urc_queue.put(b"URC2")
-        
-        count = self.driver.get_pending_urc_count()
+    def test_get_pending_async_count(self):
+        """测试获取待处理异步消息计数"""
+        # 添加一些异步消息
+        self.driver._async_queue.put(b"Async1")
+        self.driver._async_queue.put(b"Async2")
+
+        count = self.driver.get_pending_async_count()
         assert count == 2
-        
+
         # 清空后计数应为0
-        self.driver.get_urc_messages(clear=True)
-        count = self.driver.get_pending_urc_count()
+        self.driver.get_async_messages(clear=True)
+        count = self.driver.get_pending_async_count()
         assert count == 0
     
     @patch('serial2mcp.utils.metrics.metrics_collector')
@@ -192,4 +192,4 @@ class TestSerialDriverDataTransmission:
         
         assert status['is_connected'] is True
         assert status['sync_mode'] is True
-        assert status['pending_urc_count'] == 1
+        assert status['pending_async_count'] == 1
