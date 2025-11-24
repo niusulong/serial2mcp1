@@ -1,6 +1,6 @@
 # 串口底层驱动设计规范 (Serial Driver Design Spec)
 
-**版本:** V1.3 (Logic & Architecture Focus)
+**版本:** V1.4 (Logic & Architecture Focus)
 **目标:** 构建一个无业务逻辑、线程安全、支持"同步指令"与"异步消息"自动分流的串口 I/O 引擎。
 
 这是 Step 2: 底层驱动设计规范 (文档 3) 的修订版。

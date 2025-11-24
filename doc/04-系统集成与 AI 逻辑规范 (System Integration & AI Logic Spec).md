@@ -1,6 +1,6 @@
 # 系统集成与 AI 逻辑规范 (System Integration & AI Logic Spec)
 
-**版本:** V1.2
+**版本:** V1.3
 **组件:** MCP Server & Prompt Engineering
 
 这是 Step 3: 系统集成与 AI 逻辑规范 (文档 2)。
@@ -125,15 +125,15 @@ graph LR
 - Observation: Tool returns \n[BOOT] Aborted.\n>.
 - Response: "发送中断信号成功，设备已进入命令行模式，提示符为 >。"
 
-#### 场景 C：被动消息 (URC) 插入
+#### 场景 C：被动消息 (异步消息) 插入
 
 **User:** "连接 TCP 服务器。" (假设发指令时，刚好来了条短信)
 
 **AI Thinking (CoT):**
 - Action: 发送 AT+QIOPEN...，等待 OK。
-- Observation: Tool returns OK, 但返回结果中包含 "pending_urc_count": 1。
+- Observation: Tool returns OK, 但返回结果中包含 "pending_async_count": 1。
 - Reasoning: 指令执行成功了，但后台好像收到了其他东西，我应该看看，防止漏掉重要信息。
-- Action (Auto): Call Tool read_urc()。
+- Action (Auto): Call Tool read_async_messages()。
 - Observation: Returns ['\r\n+CMTI: "SM", 5\r\n'].
 - Response: "TCP 连接指令已发送并返回 OK。另外，注意： 在操作期间收到了一条新短信，存储在位置 5。"
 

@@ -1,6 +1,6 @@
 # 智能串口 MCP 工具配置与使用方式文档
 
-**版本号:** V1.2
+**版本号:** V1.3
 **项目代号:** Serial-Agent-MCP
 **创建日期:** 2025年11月24日
 
@@ -166,7 +166,7 @@ python -m serial2mcp.main
   "raw_data": "b'\\x2b\\x43\\x53\\x51\\x3a\\x20\\x32\\x32\\x2c\\x39\\x39\\x0d\\x0a\\x0d\\x0a\\x4f\\x4b\\x0d\\x0a'",
   "is_hex": false,
   "found_stop_pattern": true,
-  "pending_urc_count": 0,
+  "pending_async_count": 0,
   "bytes_received": 18
 }
 ```
@@ -198,7 +198,7 @@ python -m serial2mcp.main
   "raw_data": "b'\\x01\\x03\\x0c\\x00\\x01\\x00\\x02\\x00\\x03\\x00\\x04\\x84\\x0b'",
   "is_hex": true,
   "bytes_received": 13,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -218,14 +218,14 @@ python -m serial2mcp.main
 
 **说明**:
 - `wait_policy: "none"`: 射后不理模式
-- 数据发送后立即返回，响应将在后台积累为URC
+- 数据发送后立即返回，响应将在后台积累为异步消息
 
 返回示例：
 ```json
 {
   "success": true,
   "message": "数据已发送，不等待响应",
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -257,18 +257,18 @@ python -m serial2mcp.main
   "raw_data": "b'...'",
   "is_hex": false,
   "bytes_received": 34,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
-### 4.4 URC 消息处理
+### 4.4 异步消息处理
 
-#### 4.4.1 读取 URC 消息
-使用 `read_urc` 工具读取后台缓冲区中的未处理消息：
+#### 4.4.1 读取 异步消息
+使用 `read_async_messages` 工具读取后台缓冲区中的未处理消息：
 
 ```json
 {
-  "name": "read_urc",
+  "name": "read_async_messages",
   "arguments": {}
 }
 ```
@@ -290,8 +290,8 @@ python -m serial2mcp.main
 ```
 
 **重要提示**:
-- 每次调用 `read_urc` 会清除已读取的URC消息
-- 建议在交互后检查 `pending_urc_count` 字段，如不为0则调用 `read_urc` 处理
+- 每次调用 `read_async_messages` 会清除已读取的异步消息
+- 建议在交互后检查 `pending_async_count` 字段，如不为0则调用 `read_async_messages` 处理
 
 ## 5. 典型使用场景
 
@@ -402,7 +402,7 @@ python -m serial2mcp.main
 
 ## 8. 注意事项
 
-1. **URC 处理**: 交互后应检查 `pending_urc_count` 字段，如不为0需调用 `read_urc` 处理。
+1. **异步消息处理**: 交互后应检查 `pending_async_count` 字段，如不为0需调用 `read_async_messages` 处理。
 2. **编码选择**: AT指令使用 `utf8` 编码，二进制协议使用 `hex` 编码。
 3. **转义字符**: 在UTF-8模式下使用 `\\r\\n` 表示换行符。
 4. **等待策略**:

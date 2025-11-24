@@ -1,6 +1,6 @@
 # 串口 MCP 工具接口定义契约 (Interface Schema)
 
-**版本:** V1.2
+**版本:** V1.3
 **用途:** 定义大模型调用串口工具的标准格式。
 
 这份文档采用了标准 JSON Schema 格式（兼容 OpenAI Function Calling 和 MCP Protocol）。你可以直接将此内容复制给大模型（如 ChatGPT、Claude），并在 System Prompt 中告诉它："你拥有以下工具，请根据用户的需求选择合适的工具进行调用。"
@@ -101,12 +101,12 @@
 }
 ```
 
-### Tool 4: read_urc
+### Tool 4: read_async_messages
 
 ```json
 {
-  "name": "read_urc",
-  "description": "读取后台缓冲区中积累的未处理消息（URC）。",
+  "name": "read_async_messages",
+  "description": "读取后台缓冲区中积累的异步消息。",
   "inputSchema": {
     "type": "object",
     "properties": {},
@@ -129,7 +129,7 @@
   "is_hex": false,
   "found_stop_pattern": true,  // 仅在 keyword 模式下有效
   "bytes_received": 15,  // 接收到的字节数
-  "pending_urc_count": 2,  // 告知模型后台还有URC没读
+  "pending_async_count": 2,  // 告知模型后台还有异步消息没读
   "message": "额外信息（可选）"
 }
 ```
@@ -223,11 +223,11 @@
 }
 ```
 
-#### 4. 读 URC
+#### 4. 读异步消息
 
 ```json
 {
-  "name": "read_urc",
+  "name": "read_async_messages",
   "arguments": {}
 }
 ```

@@ -96,7 +96,7 @@
   "raw_data": "b'AT+CGMI\\r\\n\\r\\nSIMCOM INCORPORATED\\r\\n\\r\\nOK\\r\\n'",
   "is_hex": false,
   "bytes_received": 34,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -127,7 +127,7 @@
   "is_hex": false,
   "found_stop_pattern": true,
   "bytes_received": 26,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -154,7 +154,7 @@
   "raw_data": "b'AT+CGMI\\r\\n\\r\\nSIMCOM INCORPORATED\\r\\n\\r\\nOK\\r\\n'",
   "is_hex": false,
   "bytes_received": 34,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -207,7 +207,7 @@
   "raw_data": "b'\\x01\\x03\\x0c\\x00\\x01\\x00\\x02\\x00\\x03\\x00\\x04\\x84\\x0b'",
   "is_hex": true,
   "bytes_received": 13,
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
@@ -276,13 +276,13 @@
 {
   "success": true,
   "message": "数据已发送，不等待响应",
-  "pending_urc_count": 0
+  "pending_async_count": 0
 }
 ```
 
-**说明**: none模式发送后立即返回，响应将在后台积累为URC。
+**说明**: none模式发送后立即返回，响应将在后台积累为异步消息。
 
-## 6. URC处理示例
+## 6. 异步消息处理示例
 
 ### 6.1 检查待处理异步消息
 每次工具调用的返回都包含`pending_async_count`字段。如果有待处理消息，则调用`read_async_messages`：
@@ -401,7 +401,7 @@
 
 ## 9. 性能监控示例
 
-每次交互后可以检查返回结果中的性能指标，如`bytes_received`、`pending_urc_count`等字段，以评估数据交互情况。
+每次交互后可以检查返回结果中的性能指标，如`bytes_received`、`pending_async_count`等字段，以评估数据交互情况。
 
 ## 10. 特殊场景处理
 
