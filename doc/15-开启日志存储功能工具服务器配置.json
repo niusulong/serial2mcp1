@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "serial-agent-mcp": {
+      "command": "python",
+      "args": ["-m", "serial2mcp.main"],
+      "env": {
+        "PYTHONPATH": "D:\\niusulong\\serial2mcp--1\\src",
+        "SERIAL2MCP_LOG_LEVEL": "INFO",
+        "COM_LOG_ENABLED": "true",
+        "TOOL_LOG_ENABLED": "true",
+        "COM_LOG_PATH": "logs/com_log",
+        "TOOL_LOG_PATH": "logs/tool_log",
+        "LOG_RETENTION_DAYS": "30",
+        "LOG_MAX_FILE_SIZE_MB": "10"
+      }
+    }
+  }
+}

@@ -1,8 +1,8 @@
 # 智能串口 MCP 工具配置与使用方式文档
 
-**版本号:** V1.1
+**版本号:** V1.2
 **项目代号:** Serial-Agent-MCP
-**创建日期:** 2025年11月23日
+**创建日期:** 2025年11月24日
 
 ## 1. 简介
 
@@ -48,9 +48,9 @@ python -m serial2mcp.main
     "timeout": 5.0         # 超时时间
   },
   "driver": {
-    "idle_timeout": 0.1,       # 空闲超时阈值（用于URC分包）
+    "idle_timeout": 0.1,       # 空闲超时阈值（用于异步消息分包）
     "max_buffer_size": 4096,   # 最大缓冲区大小
-    "urc_buffer_size": 1000,   # URC缓冲区大小
+    "urc_buffer_size": 1000,   # 异步消息缓冲区大小
     "sync_timeout_default": 5.0 # 同步模式默认超时时间
   }
 }

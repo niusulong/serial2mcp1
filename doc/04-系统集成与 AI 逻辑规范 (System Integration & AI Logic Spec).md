@@ -1,6 +1,6 @@
 # 系统集成与 AI 逻辑规范 (System Integration & AI Logic Spec)
 
-**版本:** V1.1
+**版本:** V1.2
 **组件:** MCP Server & Prompt Engineering
 
 这是 Step 3: 系统集成与 AI 逻辑规范 (文档 2)。
@@ -39,7 +39,7 @@ graph LR
 | list_ports | 通过 SerialToolFacade 调用 ConnectionTool | facade.tool_facade.SerialToolFacade.list_ports() → tools.connection.ConnectionTool.list_ports() | serial.tools.list_ports.comports() |
 | configure_connection | 通过 SerialToolFacade 调用 ConnectionTool 解析参数 <br>if action == "open" <br> driver.connect(port, baudrate)<br>if action == "close" <br> driver.disconnect() | facade.tool_facade.SerialToolFacade.configure_connection() → tools.connection.ConnectionTool.configure_connection() | driver.connect()<br>driver.disconnect() |
 | send_data | 1. 通过 SerialToolFacade 调用 CommunicationTool 解码 payload (Hex str -> bytes)<br>2. 通过 CommunicationTool 调用 driver.send(data, wait_policy, **kwargs) | facade.tool_facade.SerialToolFacade.send_data() → tools.communication.CommunicationTool.send_data() | driver.send_data()<br>Case A: driver._receive_until_keyword(...)<br>Case B: driver._receive_until_timeout(...)<br>Case C: driver._receive_at_response(...)<br>Case D: Direct send without wait |
-| read_urc | 通过 SerialToolFacade 调用 URCTool | facade.tool_facade.SerialToolFacade.read_urc() → tools.urc.URCTool.read_urc() | driver.get_urc_messages() |
+| read_async_messages | 通过 SerialToolFacade 调用 AsyncMessageTool | facade.tool_facade.SerialToolFacade.read_async_messages() → tools.async_message.AsyncMessageTool.read_async_messages() | driver.get_async_messages() |
 
 ## 2. 系统提示词设计 (The System Prompt)
 
@@ -86,11 +86,11 @@ graph LR
    - 策略: `none`
    - 逻辑: 快速连发多条配置时使用。
 
-# URC (Unsolicited Result Code) Handling
+# 异步消息 (Async Messages) Handling
 设备随时可能上报异步消息（如 "+CMTI: SMS", "+TCPCLOSE"）。
-- 工具会在每次交互的返回结果中提示 `pending_urc_count`。
-- **规则**: 如果你发现 `pending_urc_count > 0`，或者用户询问"有没有收到新消息"，请立即调用 `read_urc`。
-- **分析**: 收到 URC 后，请解读其含义（例如：解释错误码、分析网络状态断开原因）。
+- 工具会在每次交互的返回结果中提示 `pending_async_count`。
+- **规则**: 如果你发现 `pending_async_count > 0`，或者用户询问"有没有收到新消息"，请立即调用 `read_async_messages`。
+- **分析**: 收到异步消息后，请解读其含义（例如：解释错误码、分析网络状态断开原因）。
 
 # Error Handling
 - 如果 `send_data` 返回 Timeout，不要立即报错。分析是否是 `stop_pattern` 设置错误，尝试改用 `timeout` 策略重试一次以查看原始输出。

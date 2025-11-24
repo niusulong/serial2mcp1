@@ -284,12 +284,12 @@
 
 ## 6. URC处理示例
 
-### 6.1 检查待处理URC消息
-每次工具调用的返回都包含`pending_urc_count`字段。如果有待处理消息，则调用`read_urc`：
+### 6.1 检查待处理异步消息
+每次工具调用的返回都包含`pending_async_count`字段。如果有待处理消息，则调用`read_async_messages`：
 
 ```json
 {
-  "name": "read_urc",
+  "name": "read_async_messages",
   "arguments": {}
 }
 ```
@@ -310,7 +310,7 @@
 }
 ```
 
-**重要提示**: 每次调用`read_urc`会清除已读取的URC消息。
+**重要提示**: 每次调用`read_async_messages`会清除已读取的异步消息。
 
 ## 7. 错误处理示例
 
@@ -431,10 +431,10 @@
 ```
 
 ### 10.2 长时间运行监控
-定期调用`read_urc`处理积累的消息：
+定期调用`read_async_messages`处理积累的消息：
 ```json
 {
-  "name": "read_urc",
+  "name": "read_async_messages",
   "arguments": {}
 }
 ```

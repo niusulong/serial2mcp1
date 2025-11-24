@@ -1,7 +1,7 @@
 # 串口底层驱动设计规范 (Serial Driver Design Spec)
 
-**版本:** V1.2 (Logic & Architecture Focus)
-**目标:** 构建一个无业务逻辑、线程安全、支持"同步指令"与"异步URC"自动分流的串口 I/O 引擎。
+**版本:** V1.3 (Logic & Architecture Focus)
+**目标:** 构建一个无业务逻辑、线程安全、支持"同步指令"与"异步消息"自动分流的串口 I/O 引擎。
 
 这是 Step 2: 底层驱动设计规范 (文档 3) 的修订版。
 根据您的要求，本文档不包含具体代码，而是侧重于核心逻辑描述、程序流程图 (Flowcharts) 和 时序图 (Sequence Diagrams)，以便于开发人员理解数据流向和并发控制机制。
@@ -20,7 +20,7 @@
 - 服务于大模型发起的 send_and_receive 请求。
 - 当大模型在等待结果时，数据流向此通道。
 
-**消费者 B (异步 URC 通道):**
+**消费者 B (异步消息 通道):**
 - 服务于后台日志和通知系统。
 - 当大模型空闲时，数据流向此通道，并根据时间切片自动打包。
 
@@ -29,7 +29,7 @@
 为了决定数据流向哪个消费者，驱动内部维护一个原子状态标志 (Sync Event)：
 
 - **Sync Mode (同步模式):** 标志位置位。表示"现在正在执行指令交互，所有收到的数据都属于当前指令的响应"。
-- **Idle Mode (空闲模式):** 标志位复位。表示"现在没有主动请求，所有收到的数据都是设备自动上报的 URC"。
+- **Idle Mode (空闲模式):** 标志位复位。表示"现在没有主动请求，所有收到的数据都是设备自动上报的 异步消息"。
 
 ## 2. 详细逻辑流程图 (Logic Flowcharts)
 
@@ -49,20 +49,20 @@ flowchart TD
 
     %% 同步模式处理 (直接转发)
     IsSync -- Yes --> PushResp[写入同步响应队列<br>Response Queue]
-    PushResp --> CheckURCBuffer{URC缓冲<br>非空?}
-    CheckURCBuffer -- Yes --> ForceFlush[强制打包剩余URC<br>写入URC队列] --> ResetTimer
-    CheckURCBuffer -- No --> ResetTimer[更新最后接收时间]
+    PushResp --> CheckAsyncBuffer{异步消息缓冲<br>非空?}
+    CheckAsyncBuffer -- Yes --> ForceFlush[强制打包剩余异步消息<br>写入异步消息队列] --> ResetTimer
+    CheckAsyncBuffer -- No --> ResetTimer[更新最后接收时间]
 
     %% 空闲模式处理 (缓冲+分包)
-    IsSync -- No --> AppendBuff[追加到本地 URC Buffer]
+    IsSync -- No --> AppendBuff[追加到本地 异步消息 Buffer]
     AppendBuff --> ResetTimer
 
-    %% 空闲超时检查 (URC 分包核心逻辑)
-    HasData -- No --> CheckBuff{URC Buffer<br>非空?}
+    %% 空闲超时检查 (异步消息 分包核心逻辑)
+    HasData -- No --> CheckBuff{异步消息 Buffer<br>非空?}
     CheckBuff -- Yes --> TimeDiff{当前时间 - 最后接收时间<br> > 空闲阈值(100ms)?}
-    TimeDiff -- Yes --> PackURC[打包 Buffer 内容<br>生成 URC 消息]
-    PackURC --> PushURC[写入异步 URC 队列<br>URC Queue]
-    PushURC --> ClearBuff[清空 URC Buffer]
+    TimeDiff -- Yes --> PackAsync[打包 Buffer 内容<br>生成 异步消息]
+    PackAsync --> PushAsync[写入异步消息队列<br>异步消息 Queue]
+    PushAsync --> ClearBuff[清空 异步消息 Buffer]
 
     %% 循环
     ResetTimer --> Sleep[微小休眠 10ms]

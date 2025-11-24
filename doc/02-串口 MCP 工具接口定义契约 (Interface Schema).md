@@ -1,6 +1,6 @@
 # 串口 MCP 工具接口定义契约 (Interface Schema)
 
-**版本:** V1.1
+**版本:** V1.2
 **用途:** 定义大模型调用串口工具的标准格式。
 
 这份文档采用了标准 JSON Schema 格式（兼容 OpenAI Function Calling 和 MCP Protocol）。你可以直接将此内容复制给大模型（如 ChatGPT、Claude），并在 System Prompt 中告诉它："你拥有以下工具，请根据用户的需求选择合适的工具进行调用。"
@@ -12,7 +12,7 @@
 | list_ports | 列出当前系统所有可用的串口设备。 | 无 |
 | configure_connection | 打开或关闭串口，配置参数。 | action, port, baudrate |
 | send_data | 核心函数。发送数据并根据策略获取响应。 | payload, wait_policy, stop_pattern |
-| read_urc | 读取后台缓冲区中积累的未处理消息（URC）。 | 无 |
+| read_async_messages | 读取后台缓冲区中积累的异步消息。 | 无 |
 
 ## 2. 详细 JSON Schema 定义
 
