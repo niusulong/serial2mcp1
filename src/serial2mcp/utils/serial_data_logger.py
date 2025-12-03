@@ -9,13 +9,16 @@ from typing import Optional, Union, BinaryIO
 import threading
 from pathlib import Path
 
+# 延迟导入以避免循环导入
+_config_manager = None
+
 
 class SerialDataLogger:
     """
     串口数据日志记录器
     记录串口通信的原始数据，支持HEX和字符串两种格式
     """
-    
+
     def __init__(self, port_name: str, log_dir: str = "logs/com_log"):
         """
         初始化串口数据日志记录器
@@ -30,7 +33,7 @@ class SerialDataLogger:
         self.txt_file: Optional[BinaryIO] = None
         self.file_lock = threading.Lock()  # 确保文件操作线程安全
         self.is_logging = False
-        
+
         # 创建日志目录
         self.log_dir.mkdir(parents=True, exist_ok=True)
     
@@ -150,12 +153,11 @@ class SerialDataLoggerManager:
     串口数据日志记录器管理器
     管理多个串口的数据日志记录器
     """
-    
-    def __init__(self, log_dir: str = "logs/com_log"):
+
+    def __init__(self):
         self.loggers = {}
-        self.log_dir = log_dir
         self.lock = threading.Lock()
-    
+
     def get_logger(self, port_name: str) -> SerialDataLogger:
         """
         获取指定串口的日志记录器
@@ -166,9 +168,17 @@ class SerialDataLoggerManager:
         Returns:
             串口数据日志记录器实例
         """
+        # 从配置中动态获取日志路径
+        global _config_manager
+        if _config_manager is None:
+            from .config import config_manager
+            _config_manager = config_manager
+
+        config = _config_manager.get_config()
+
         with self.lock:
             if port_name not in self.loggers:
-                self.loggers[port_name] = SerialDataLogger(port_name, self.log_dir)
+                self.loggers[port_name] = SerialDataLogger(port_name, config.logging.com_log_path)
             return self.loggers[port_name]
     
     def start_logging(self, port_name: str) -> None:
@@ -214,4 +224,5 @@ class SerialDataLoggerManager:
 
 
 # 全局串口数据日志管理器实例
+# 注意：初始化时不指定具体路径，get_logger方法中会动态使用配置中的路径
 serial_data_logger_manager = SerialDataLoggerManager()
