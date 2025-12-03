@@ -40,56 +40,12 @@ def setup_logging(level: str = "INFO", format_type: str = "console", enable_file
         # 确保日志文件目录存在
         log_file_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # 配置结构化日志
-    if format_type == "json":
-        # JSON 格式日志配置
-        structlog.configure(
-            processors=[
-                structlog.contextvars.merge_contextvars,
-                structlog.stdlib.filter_by_level,
-                structlog.processors.TimeStamper(fmt="iso", utc=True),
-                structlog.stdlib.add_logger_name,
-                structlog.stdlib.add_log_level,
-                structlog.stdlib.PositionalArgumentsFormatter(),
-                structlog.processors.UnicodeDecoder(),
-                structlog.processors.format_exc_info,
-                structlog.processors.JSONRenderer()
-            ],
-            context_class=dict,
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            cache_logger_on_first_use=True,
-        )
-    else:
-        # 控制台格式日志配置（对于MCP，我们仍然配置格式，但可能不需要实际输出到控制台）
-        structlog.configure(
-            processors=[
-                structlog.contextvars.merge_contextvars,
-                structlog.stdlib.filter_by_level,
-                structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
-                structlog.stdlib.add_logger_name,
-                structlog.stdlib.add_log_level,
-                structlog.stdlib.PositionalArgumentsFormatter(),
-                structlog.processors.UnicodeDecoder(),
-                structlog.processors.format_exc_info,
-                structlog.dev.ConsoleRenderer()
-            ],
-            context_class=dict,
-            logger_factory=structlog.stdlib.LoggerFactory(),
-            wrapper_class=structlog.stdlib.BoundLogger,
-            cache_logger_on_first_use=True,
-        )
-
     # 配置根日志记录器，可以选择性地输出到控制台或仅输出到文件
     handlers = []
 
-    # 如果不是MCP服务器环境，可以添加控制台处理器
-    if not disable_console:
-        handlers.append(logging.StreamHandler(sys.stdout))
-
     # 添加文件处理器（如果启用文件日志）
     if enable_file_logging and 'log_file_path' in locals():
-        # 对于文件日志使用标准logging格式，避免与structlog冲突
+        # 对于文件日志使用标准logging格式
         try:
             file_handler = logging.FileHandler(log_file_path, encoding='utf-8')
             file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -100,12 +56,54 @@ def setup_logging(level: str = "INFO", format_type: str = "console", enable_file
             # 如果无法创建日志文件，仍然继续运行，但禁用文件日志
             enable_file_logging = False
 
+    # 如果不是MCP服务器环境，可以添加控制台处理器
+    if not disable_console:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        console_handler.setFormatter(console_formatter)
+        handlers.append(console_handler)
+
     # 配置根日志记录器
     logging.basicConfig(
         level=numeric_level,
-        format="%(message)s",
         handlers=handlers,
         force=True  # 强制重新配置
+    )
+
+    # 配置结构化日志，让structlog使用标准logging作为后端
+    if format_type == "json":
+        # JSON 格式日志配置
+        processors = [
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.filter_by_level,
+            structlog.processors.TimeStamper(fmt="iso", utc=True),
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.format_exc_info,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,  # 让structlog使用logging处理器
+        ]
+    else:
+        # 普通格式日志配置（避免颜色代码）
+        processors = [
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.UnicodeDecoder(),
+            structlog.processors.format_exc_info,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,  # 让structlog使用logging处理器
+        ]
+
+    # 配置structlog
+    structlog.configure(
+        processors=processors,
+        context_class=dict,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
     )
 
 
