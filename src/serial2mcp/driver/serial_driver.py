@@ -12,7 +12,8 @@ from ..utils.exceptions import (
     SerialConnectionError,
     SerialDataError,
     TimeoutError as SerialTimeoutError,
-    DriverNotInitializedError
+    DriverNotInitializedError,
+    InvalidInputError
 )
 from ..utils.config import config_manager
 from ..utils.metrics import metrics_collector
@@ -137,17 +138,16 @@ class SerialDriver:
             raise SerialConnectionError("串口未连接")
 
         try:
-            # 记录发送数据到性能指标
-            metrics_collector.record_send(len(data))
-
-            self.connection_manager.write(data)
-            decoded_data = data.decode('utf-8', errors='replace') if not is_hex else data.hex()
-            self.logger.debug(f"发送数据: {len(data)} 字节, 内容: {decoded_data}")
-
             # 根据策略获取响应
             if wait_policy == 'none':
                 # 射后不理模式：直接发送数据
+                # 记录发送数据到性能指标
+                metrics_collector.record_send(len(data))
+
                 self.connection_manager.write(data)
+                decoded_data = data.decode('utf-8', errors='replace') if not is_hex else data.hex()
+                self.logger.debug(f"发送数据: {len(data)} 字节, 内容: {decoded_data}")
+
                 return {
                     'success': True,
                     'message': '数据已发送，不等待响应',
@@ -170,8 +170,12 @@ class SerialDriver:
                 # 发送数据前清空输入缓冲区，防止残留数据干扰
                 self.connection_manager.flush_input()
 
-                # 发送数据
+                # 记录发送数据到性能指标
+                metrics_collector.record_send(len(data))
+
                 self.connection_manager.write(data)
+                decoded_data = data.decode('utf-8', errors='replace') if not is_hex else data.hex()
+                self.logger.debug(f"发送数据: {len(data)} 字节, 内容: {decoded_data}")
 
                 # 立即开始接收响应（在同步模式下）
                 if wait_policy == 'keyword':
