@@ -31,8 +31,8 @@ class CommunicationTool(BaseTool):
             if not payload:
                 raise InvalidInputError("必须指定要发送的数据 (payload)")
 
-            if wait_policy not in ['keyword', 'timeout', 'none', 'at_command']:
-                raise InvalidInputError(f"无效的等待策略: {wait_policy}，支持的策略: keyword, timeout, none, at_command")
+            if wait_policy not in ['keyword', 'timeout', 'none']:
+                raise InvalidInputError(f"无效的等待策略: {wait_policy}，支持的策略: keyword, timeout, none")
 
             if not self.driver.is_connected():
                 raise InvalidInputError("串口未连接")
@@ -67,13 +67,6 @@ class CommunicationTool(BaseTool):
                     timeout=timeout_ms/1000.0
                 )
 
-            elif wait_policy == 'at_command':
-                # AT命令模式 - 专门处理回显和响应
-                result = self.driver.send_data(
-                    data_bytes,
-                    wait_policy='at_command',
-                    timeout=timeout_ms/1000.0
-                )
 
             if result is None:
                 result = {

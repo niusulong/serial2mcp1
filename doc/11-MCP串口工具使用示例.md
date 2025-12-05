@@ -73,20 +73,21 @@
 
 该工具支持四种等待策略，可根据不同场景选择：
 
-### 2.1 AT指令交互（推荐使用at_command模式）
+### 2.1 AT指令交互（推荐使用keyword模式）
 ```json
 {
   "name": "send_data",
   "arguments": {
     "payload": "AT+CGMI\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 3000
   }
 }
 ```
 
-**说明**: at_command模式专门优化AT指令交互，自动处理回显和响应。
+**说明**: keyword模式用于等待AT指令响应结束标识，通常以"OK"结尾。
 
 返回示例：
 ```json
@@ -165,7 +166,8 @@
   "arguments": {
     "payload": "AT+CSQ\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 3000
   }
 }
@@ -178,7 +180,8 @@
   "arguments": {
     "payload": "AT+CREG?\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 3000
   }
 }
@@ -383,7 +386,8 @@
   "arguments": {
     "payload": "ATI\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 3000
   }
 }
@@ -424,7 +428,8 @@
   "arguments": {
     "payload": "AT\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 10000  // 设置较长超时
   }
 }
@@ -442,7 +447,7 @@
 ## 11. 策略选择指南
 
 ### 11.1 AT指令处理
-- **at_command**: 推荐用于标准AT指令，自动处理回显和响应
+- **keyword**: 推荐用于标准AT指令，等待响应结束标识(如OK)
 - **keyword**: 适用于需要特定关键词确认的场景
 - **例**: AT+CSQ, AT+CGMI 等查询指令
 

@@ -59,18 +59,17 @@ graph LR
 3. **十六进制处理**:
    - 当用户要求发送 HEX/Modbus 数据时，payload 必须是空格分隔的 Hex 字符串 (如 "01 03 00 00")。
    - 将 `encoding` 参数设为 "hex"。
-   - 通常应配合 `timeout` 或 `at_command` 策略使用，因为二进制协议通常没有固定的结束符。
+   - 通常应配合 `timeout` 策略使用，因为二进制协议通常没有固定的结束符。
 
 # Decision Logic for "wait_policy" (重要)
 每次发送数据前，你必须根据指令类型决定接收策略：
 
 1. **CASE A: 标准 AT 指令 (如 "AT+CSQ")**
-   - 策略: `at_command`
-   - 逻辑: 专门用于AT指令的处理，自动处理回显和响应
-   - 建议: `wait_policy="at_command"`, `timeout_ms=3000`。
-   - 备选策略: `keyword`
-   - 关键字: 绝大多数 AT 指令以 "OK" 或 "ERROR" 结尾。
+   - 策略: `keyword` (推荐)
+   - 逻辑: 等待AT响应结束标识
    - 建议: `wait_policy="keyword"`, `stop_pattern="OK"`, `timeout_ms=3000`。
+   - 备选策略: `timeout`
+   - 说明: 使用超时策略收集指定时间内的所有响应数据
 
 2. **CASE B: 交互式输入 (如 "AT+CMGS" 发短信)**
    - 策略: `keyword`
@@ -108,8 +107,8 @@ graph LR
 **AI Thinking (CoT):**
 - Analysis: 用户想查信号，对应的 AT 指令是 AT+CSQ。
 - Protocol: 这是一个标准 AT 指令，成功通常返回 OK。
-- Strategy: 使用 at_command，专门处理AT指令。
-- Action: Call Tool send_data(payload="AT+CSQ\r\n", encoding="utf8", wait_policy="at_command", timeout_ms=3000)。
+- Strategy: 使用 keyword 模式，等待AT响应结束标识。
+- Action: Call Tool send_data(payload="AT+CSQ\r\n", encoding="utf8", wait_policy="keyword", stop_pattern="OK", timeout_ms=3000)。
 - Observation: Tool returns +CSQ: 22,99\r\n\r\nOK.
 - Response: "当前信号强度 (RSSI) 为 22，误码率为 99（未知）。信号状况良好。"
 

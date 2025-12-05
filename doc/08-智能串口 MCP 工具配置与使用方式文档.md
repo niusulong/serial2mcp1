@@ -238,15 +238,15 @@ python -m serial2mcp.main
   "arguments": {
     "payload": "AT+CGMI\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
     "timeout_ms": 3000
   }
 }
 ```
 
 **说明**:
-- `wait_policy: "at_command"`: AT命令专用模式
-- 专门优化用于AT指令交互，自动处理回显和响应
+- `wait_policy: "keyword"`: 关键字等待模式
+- 等待特定停止模式（如"OK"）出现后返回
 - 适合标准AT指令交互场景
 
 返回示例：
@@ -296,7 +296,7 @@ python -m serial2mcp.main
 ## 5. 典型使用场景
 
 ### 5.1 AT 指令交互
-标准 AT 指令交互，推荐使用 at_command 或 keyword 模式：
+标准 AT 指令交互，推荐使用 keyword 模式：
 
 ```json
 {
@@ -304,7 +304,8 @@ python -m serial2mcp.main
   "arguments": {
     "payload": "AT+CSQ\\r\\n",
     "encoding": "utf8",
-    "wait_policy": "at_command",
+    "wait_policy": "keyword",
+    "stop_pattern": "OK",
     "timeout_ms": 3000
   }
 }
@@ -409,6 +410,5 @@ python -m serial2mcp.main
    - `keyword`: 适合AT指令，等待特定停止模式
    - `timeout`: 适合二进制协议，等待固定时间
    - `none`: 适合配置命令，发送后不等待
-   - `at_command`: 专门用于AT指令，自动处理回显
 5. **连接管理**: 使用完毕后务必调用 `configure_connection` 且 `action: "close"` 关闭连接。
 6. **性能考虑**: 合理设置超时时间，避免过长等待影响响应性。

@@ -126,7 +126,7 @@ class SerialDriver:
 
         Args:
             data: 要发送的字节数据
-            wait_policy: 等待策略 ('none', 'keyword', 'timeout', 'at_command')
+            wait_policy: 等待策略 ('none', 'keyword', 'timeout')
             stop_pattern: 仅在 'keyword' 模式下有效，停止模式
             timeout: 等待超时时间（秒）
             is_hex: 是否为十六进制数据
@@ -153,7 +153,7 @@ class SerialDriver:
                     'message': '数据已发送，不等待响应',
                     'pending_async_count': self.get_pending_async_count()
                 }
-            elif wait_policy in ['keyword', 'timeout', 'at_command']:
+            elif wait_policy in ['keyword', 'timeout']:
                 # 清空同步响应队列以避免之前的残留数据
                 while not self._sync_response_queue.empty():
                     try:
@@ -183,10 +183,6 @@ class SerialDriver:
                     result = self._receive_until_keyword(stop_pattern, timeout)
                 elif wait_policy == 'timeout':
                     result = self._receive_until_timeout(timeout)
-                elif wait_policy == 'at_command':
-                    # 专门针对AT指令的处理模式：等待回显+响应
-                    original_cmd = data.decode('utf-8', errors='replace')
-                    result = self._receive_at_response(original_cmd, timeout)
 
                 # 退出同步模式
                 self._sync_mode.clear()
@@ -355,10 +351,6 @@ class SerialDriver:
                 'success': True
             }
 
-    def _receive_at_response(self, original_cmd: str, timeout: float) -> Dict[str, Any]:
-        """接收AT命令响应，简单地在超时时间内收集所有数据"""
-        # 直接使用超时接收方法收集所有数据
-        return self._receive_until_timeout(timeout)
 
     def send_string(self, data: str, encoding: str = 'utf-8') -> None:
         """

@@ -38,11 +38,6 @@
 - 发送数据后立即返回"发送成功"，不读取任何响应。
 - 后续产生的响应数据归入"被动接收流（异步消息）"处理。
 
-**F2-4 AT命令模式 (AT Command Mode)：**
-- 专门处理AT命令的回显和响应。
-- 自动处理命令回显（如发送"AT+CSQ\r"后会收到回显"AT+CSQ\r"）。
-- 适用场景：标准AT指令交互。
-
 ### 2.3 数据流处理与 异步消息 (Data Stream Processor)
 由于串口是字节流，工具需负责将流切分为"包"：
 
@@ -82,7 +77,7 @@
 **参数：**
 - payload: 发送内容
 - encoding: 编码格式 (utf8/hex)
-- wait_policy: 等待策略 (keyword/timeout/none/at_command)
+- wait_policy: 等待策略 (keyword/timeout/none)
 - stop_pattern: 仅在 keyword 模式下有效（如 'OK'）
 - timeout_ms: 等待超时时间（毫秒）
 

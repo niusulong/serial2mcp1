@@ -84,8 +84,8 @@
       },
       "wait_policy": {
         "type": "string",
-        "enum": ["keyword", "timeout", "none", "at_command"],
-        "description": "等待策略：'keyword'关键字等待模式，'timeout'纯时间等待模式，'none'射后不理模式，'at_command'AT命令专用模式"
+        "enum": ["keyword", "timeout", "none"],
+        "description": "等待策略：'keyword'关键字等待模式，'timeout'纯时间等待模式，'none'射后不理模式"
       },
       "stop_pattern": {
         "type": "string",
@@ -160,10 +160,6 @@
 - **适用**: 配置命令等不需要响应的场景
 - **参数**: 无需特殊参数
 
-### 4.4 at_command 模式
-- **用途**: 专门用于AT命令，自动处理回显和响应
-- **适用**: 标准AT指令交互
-- **参数**: 需要设置 `timeout_ms`
 
 ## 5. 验证测试 (Self-Check)
 

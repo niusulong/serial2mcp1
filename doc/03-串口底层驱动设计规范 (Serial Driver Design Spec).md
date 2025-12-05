@@ -244,7 +244,7 @@ sequenceDiagram
 - **connect(port, baudrate):** 初始化资源，启动 Reader 线程。
 - **disconnect():** 设置停止事件，等待线程 Join，释放资源。
 - **write(bytes):** 纯粹的硬件写入。
-- **send_data(bytes, wait_policy, **kwargs):** 根据不同的等待策略，封装了完整的发送和接收逻辑。支持 keyword, timeout, none, at_command 四种模式。
+- **send_data(bytes, wait_policy, **kwargs):** 根据不同的等待策略，封装了完整的发送和接收逻辑。支持 keyword, timeout, none 三种模式。
 - **read_sync(wait_policy, parameter):** 封装了"进入Sync模式 -> 循环读取 -> 退出Sync模式"的完整生命周期。这是暴露给 MCP 工具层的读取接口之一。
 - **read_urc():** 简单的从 URC_Queue 中 get_all。
 - **initialize():** 驱动初始化方法，初始化所有内部组件。

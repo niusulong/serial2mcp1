@@ -1,6 +1,6 @@
 # Serial-Agent-MCP
 
-**版本号:** V1.2
+**版本号:** V1.3
 **项目代号:** Serial-Agent-MCP
 
 基于 MCP (Model Context Protocol) 的智能串口交互工具，作为大语言模型与物理硬件之间的桥梁。
