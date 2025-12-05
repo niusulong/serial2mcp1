@@ -29,7 +29,7 @@
 
 3. **send_data**: 发送数据并根据策略获取响应
    - 输入: payload(发送内容), encoding(编码格式), wait_policy(等待策略), stop_pattern(停止模式), timeout_ms(超时时间)
-   - 支持多种等待策略: keyword(关键字模式), timeout(超时模式), none(射后不理), at_command(AT命令模式)
+   - 支持多种等待策略: keyword(关键字模式), timeout(超时模式), none(射后不理)
    - 返回: 发送结果和响应数据
 
 4. **read_async_messages**: 读取后台缓冲区中积累的异步消息
