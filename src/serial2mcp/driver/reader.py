@@ -105,6 +105,9 @@ class BackgroundReader:
         """后台接收线程主循环"""
         self.logger.debug("后台接收线程主循环开始")
 
+        # 为RX数据添加消息缓冲区，用于基于回车换行符的完整消息记录
+        rx_message_buffer = bytearray()
+
         while not self.stop_event.is_set():
             try:
                 # 检查串口是否连接
@@ -123,9 +126,27 @@ class BackgroundReader:
                         # 记录接收数据到性能指标
                         metrics_collector.record_receive(len(data))
 
-                        # 记录接收到的数据到通信日志
+                        # 基于回车换行符的消息边界记录日志
                         if self.current_port and self.config.logging.com_log_enabled:
-                            serial_data_logger_manager.log_data(self.current_port, 'RX', data)
+                            # 将新数据添加到RX缓冲区
+                            rx_message_buffer.extend(data)
+
+                            # 检查是否有完整的基于回车换行的消息
+                            while b'\n' in rx_message_buffer:
+                                # 找到第一个换行符的位置
+                                newline_idx = rx_message_buffer.find(b'\n')
+                                # 提取完整的消息（包含换行符）
+                                complete_message = rx_message_buffer[:newline_idx + 1]
+                                # 保留剩余数据
+                                rx_message_buffer = rx_message_buffer[newline_idx + 1:]
+
+                                # 记录完整的RX消息到日志
+                                serial_data_logger_manager.log_data(self.current_port, 'RX', complete_message)
+
+                            # 如果没有完整的消息，继续收集数据
+                        else:
+                            # 如果日志未启用，仍然需要更新接收时间
+                            pass
 
                         # 根据当前模式决定数据流向
                         if self.sync_mode_event.is_set():
@@ -165,8 +186,13 @@ class BackgroundReader:
                 if not self.stop_event.is_set():  # 如果不是主动停止
                     self.logger.error(f"后台接收线程发生未知错误: {e}")
                     metrics_collector.record_error()
-                    # 短暂休眠后继续尝试
+                    # 短暂休眠后继续 try
                     time.sleep(0.5)
+
+        # 线程结束前，处理剩余的RX缓冲区数据
+        if rx_message_buffer and self.current_port and self.config.logging.com_log_enabled:
+            # 记录未完成的消息（可能没有换行结尾）
+            serial_data_logger_manager.log_data(self.current_port, 'RX', bytes(rx_message_buffer))
 
         # 线程结束前，确保异步缓冲区中的数据被处理
         self._flush_async_buffer()
